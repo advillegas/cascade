@@ -306,6 +306,7 @@ function TrayPiece({ piece, faded, onPointerDown, slotSize, enterKey }) {
 
 export default function App() {
   const [board, setBoard] = useState(emptyBoard);
+  const boardStateRef = useRef(null);
   const [tray, setTray] = useState(newTray);
   const [trayKey, setTrayKey] = useState(0);
   const [score, setScore] = useState(0);
@@ -638,6 +639,10 @@ export default function App() {
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
   }, []);
+
+  // Keep boardStateRef in sync with board so refs-closed-over code
+  // (e.g. the snake tick interval) always reads the latest cells.
+  useEffect(() => { boardStateRef.current = board; }, [board]);
 
   useEffect(() => {
     if (displayScore === score) return;
@@ -1370,7 +1375,11 @@ export default function App() {
     if (nc < 0) nc = GRID - 1;
     if (nc >= GRID) nc = 0;
 
-    const willEat = !!board[nr][nc];
+    // Always read the freshest board. The snake interval's closure captures
+    // `board` at activation; using the ref avoids stale cells that would
+    // phantom-grow the snake on already-eaten squares.
+    const liveBoard = boardStateRef.current || board;
+    const willEat = !!liveBoard[nr][nc];
     // If eating, tail stays → head may collide with tail; if not eating, tail moves → exclude tail from check
     const collideList = willEat ? body : body.slice(0, -1);
     const bit = collideList.some(s => s.r === nr && s.c === nc);
@@ -3420,16 +3429,17 @@ export default function App() {
               >
                 <span style={{ fontSize: 13 }}>🐍</span>
                 <span>{snakeActive ? 'LIVE' : 'SNAKE'}</span>
-                {!snakeActive && (
-                  <span style={{
-                    padding: '2px 8px',
-                    background: hasSnake ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.08)',
-                    borderRadius: 100,
-                    fontSize: 11,
-                  }}>
-                    {snakeCharges}
-                  </span>
-                )}
+                {/* Always render the charges badge so button width stays constant
+                    when snake toggles active — prevents layout reflow/rescale. */}
+                <span style={{
+                  padding: '2px 8px',
+                  background: hasSnake ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.08)',
+                  borderRadius: 100,
+                  fontSize: 11,
+                  visibility: snakeActive ? 'hidden' : 'visible',
+                }}>
+                  {snakeCharges}
+                </span>
               </button>
             );
           })()}
