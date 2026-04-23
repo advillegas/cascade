@@ -3418,7 +3418,7 @@ export default function App() {
           border: '1px solid rgba(255,255,255,0.05)',
         }}>
           {tray.map((piece, i) => {
-            const isDragging = drag?.trayIndex === i;
+            const isDragging = drag?.trayIndex === i && drag?.moved;
             return (
               <TrayPiece
                 key={`${trayKey}-${i}-${piece?.id || 'empty'}`}
@@ -3784,7 +3784,7 @@ export default function App() {
         </div>
       </div>
 
-      {drag && (
+      {drag && drag.moved && (
         <div style={{
           position: 'fixed',
           left: drag.pLeft,
