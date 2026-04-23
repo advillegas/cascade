@@ -1408,6 +1408,25 @@ export default function App() {
     if (!snakeActiveRef.current) return;
     if (pausedRef.current) return;
 
+    // End immediately if the board is already empty (covers activation's
+    // starting-cell freebies clearing the last blocks, or any other route
+    // to an empty grid during snake mode).
+    {
+      const lb = boardStateRef.current;
+      if (lb) {
+        let anyLeft = false;
+        for (let r = 0; r < GRID && !anyLeft; r++) {
+          for (let c = 0; c < GRID; c++) {
+            if (lb[r][c]) { anyLeft = true; break; }
+          }
+        }
+        if (!anyLeft) {
+          endSnake(true);
+          return;
+        }
+      }
+    }
+
     // Resolve direction (queued if not directly opposite)
     const currentDir = snakeDirRef.current;
     const queued = snakeQueuedRef.current;
