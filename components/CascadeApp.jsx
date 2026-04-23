@@ -2059,7 +2059,11 @@ export default function App() {
 
   // Shared shell style for all screens
   const shellStyle = {
+    // Fill the real visible viewport (handles mobile toolbars via dvh).
+    // Falls back to 100vh in browsers that don't know dvh.
+    height: '100dvh',
     minHeight: '100vh',
+    maxHeight: '100dvh',
     width: '100%',
     background: 'radial-gradient(ellipse at top, #1a1440 0%, #0a0818 55%, #050410 100%)',
     color: '#fff',
@@ -2161,7 +2165,9 @@ export default function App() {
           flexDirection: 'column',
           alignItems: 'center',
           gap: 20,
-          minHeight: '100vh',
+          height: '100%',
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
           justifyContent: 'center',
         }}>
           {/* Top bar: coin balance */}
@@ -2438,7 +2444,7 @@ export default function App() {
     return (
       <div style={shellStyle}>
         {fontsAndKeyframes}
-        <div style={{ padding: '20px 20px 40px', minHeight: '100vh' }}>
+        <div style={{ padding: '20px 20px 40px', height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
             <button
               onClick={() => setScreen('menu')}
@@ -2568,7 +2574,7 @@ export default function App() {
     return (
       <div style={shellStyle}>
         {fontsAndKeyframes}
-        <div style={{ padding: '20px 20px 40px', minHeight: '100vh' }}>
+        <div style={{ padding: '20px 20px 40px', height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
             <button
               onClick={() => setScreen('menu')}
@@ -2671,7 +2677,9 @@ export default function App() {
 
   return (
     <div style={{
+      height: '100dvh',
       minHeight: '100vh',
+      maxHeight: '100dvh',
       width: '100%',
       background: 'radial-gradient(ellipse at top, #1a1440 0%, #0a0818 55%, #050410 100%)',
       color: '#fff',
@@ -2681,6 +2689,8 @@ export default function App() {
       WebkitUserSelect: 'none',
       overflow: 'hidden',
       position: 'relative',
+      display: 'flex',
+      flexDirection: 'column',
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Rubik:wght@400;500;700;900&display=swap');
@@ -2984,7 +2994,11 @@ export default function App() {
             onPointerUp={snakeSwipe.onPointerUp}
             onPointerCancel={snakeSwipe.onPointerCancel}
             style={{
-              width: '100%',
+              // Cap width so HUD + board + tray fit within one viewport height
+              // without the page needing to scroll. ~260px reserves space for
+              // the top HUD and bottom tray across all supported screens.
+              width: 'min(100%, calc(100dvh - 260px))',
+              alignSelf: 'center',
               aspectRatio: '1 / 1',
               display: 'grid',
               gridTemplateColumns: `repeat(${GRID}, 1fr)`,
