@@ -2687,8 +2687,7 @@ export default function App() {
 
   return (
     <div style={{
-      height: '100dvh',
-      maxHeight: '100dvh',
+      minHeight: '100dvh',
       width: '100%',
       background: 'radial-gradient(ellipse at top, #1a1440 0%, #0a0818 55%, #050410 100%)',
       color: '#fff',
@@ -2696,7 +2695,6 @@ export default function App() {
       touchAction: 'manipulation',
       userSelect: 'none',
       WebkitUserSelect: 'none',
-      overflow: 'hidden',
       position: 'relative',
     }}>
       <style>{`
@@ -2919,10 +2917,10 @@ export default function App() {
                 </div>
               </div>
             </div>
-            {/* Reserved row for CHAIN / DANGER badges — always rendered so
-                HUD height stays constant and the board doesn't rescale when
-                streak or danger toggles. */}
-            <div style={{ marginTop: 4, height: 24, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {/* Reserved slot for CHAIN / DANGER badges. minHeight keeps
+                the row from collapsing when neither is visible, so board
+                size stays constant while they toggle. */}
+            <div style={{ marginTop: 2, minHeight: 22, display: 'flex', alignItems: 'center', gap: 6 }}>
             {(streak >= 2) && (
               <div style={{
                 padding: '4px 10px',
@@ -2965,9 +2963,10 @@ export default function App() {
         {/* Board — takes full container width, always square */}
         <div style={{
           position: 'relative',
-          // Reserve ~300px for HUD + tray + buttons so powerups stay visible
-          // even on short viewports. Cap at 440 so it doesn't get massive on tablets.
-          width: 'min(100%, 440px, calc(100dvh - 300px))',
+          // Reserve vertical room for HUD + tray + buttons so everything is
+          // visible without scroll when the page is locked (PWA mode).
+          // Regular browser tabs can scroll, so this is a fit-target, not a cap.
+          width: 'min(100%, 440px, calc(100dvh - 280px))',
           alignSelf: 'center',
         }}>
           {/* Snake mode HUD — shows above the board while snake is active */}
