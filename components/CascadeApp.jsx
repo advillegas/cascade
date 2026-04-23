@@ -1385,10 +1385,21 @@ export default function App() {
     if (!willEat) newBody.pop();
 
     if (willEat) {
-      // Eat the block: remove from board, bump counters, pop sound, coin drop
+      // Eat the block and — using the fresh post-eat board — detect a perfect
+      // clear. The `board` closure is stale because the snake interval is
+      // created once per session, so we must read authoritative state inside
+      // the functional updater.
+      let clearedBoard = false;
       setBoard(b => {
         const nb = b.map(row => [...row]);
         nb[nr][nc] = null;
+        let anyRemaining = false;
+        for (let r = 0; r < GRID && !anyRemaining; r++) {
+          for (let c = 0; c < GRID; c++) {
+            if (nb[r][c]) { anyRemaining = true; break; }
+          }
+        }
+        clearedBoard = !anyRemaining;
         return nb;
       });
       snakeEatenRef.current += 1;
@@ -1411,16 +1422,8 @@ export default function App() {
       }
       vibe(10);
 
-      // If this eat was the last block on the board, end with PERFECT celebration
-      let anyRemaining = false;
-      for (let r = 0; r < GRID && !anyRemaining; r++) {
-        for (let c = 0; c < GRID; c++) {
-          if (r === nr && c === nc) continue; // just ate this one
-          if (board[r][c]) { anyRemaining = true; break; }
-        }
-      }
-      if (!anyRemaining) {
-        // Still commit the body update so the final eat animates naturally
+      if (clearedBoard) {
+        // Commit the final body move so the last eat animates before celebration
         snakeBodyRef.current = newBody;
         setSnakeBody(newBody);
         setTimeout(() => {
