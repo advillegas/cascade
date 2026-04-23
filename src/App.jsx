@@ -56,6 +56,85 @@ const pickPowerup = () => {
   return POWERUPS[0];
 };
 
+// Per-level visual themes — background gradient + accent color. Cycles through levels.
+const LEVEL_THEMES = [
+  { name: 'NEON',      bg: 'radial-gradient(ellipse at top, #1a1440 0%, #0a0818 55%, #050410 100%)', accent: '#a855f7', glow: 'rgba(168,85,247,0.3)' },
+  { name: 'OCEAN',     bg: 'radial-gradient(ellipse at top, #0a2a4a 0%, #051a2a 55%, #020a14 100%)', accent: '#00d4ff', glow: 'rgba(0,212,255,0.3)' },
+  { name: 'SUNSET',    bg: 'radial-gradient(ellipse at top, #4a1a2e 0%, #2a0a1a 55%, #140510 100%)', accent: '#ff7b2e', glow: 'rgba(255,123,46,0.3)' },
+  { name: 'FOREST',    bg: 'radial-gradient(ellipse at top, #0a3a1a 0%, #051a0a 55%, #020a05 100%)', accent: '#22d65f', glow: 'rgba(34,214,95,0.3)' },
+  { name: 'VAPORWAVE', bg: 'radial-gradient(ellipse at top, #3a0a3a 0%, #1a041a 55%, #0a020a 100%)', accent: '#ff2e6e', glow: 'rgba(255,46,110,0.3)' },
+  { name: 'GOLDRUSH',  bg: 'radial-gradient(ellipse at top, #4a3a0a 0%, #1a1405 55%, #0a0702 100%)', accent: '#ffd60a', glow: 'rgba(255,214,10,0.3)' },
+  { name: 'AURORA',    bg: 'radial-gradient(ellipse at top, #0a4a3a 0%, #051a14 55%, #02140a 100%)', accent: '#00ffc2', glow: 'rgba(0,255,194,0.3)' },
+  { name: 'MIDNIGHT',  bg: 'radial-gradient(ellipse at top, #1a0a4a 0%, #0a041a 55%, #05020a 100%)', accent: '#7aeaff', glow: 'rgba(122,234,255,0.3)' },
+];
+const themeForLevel = (lvl) => LEVEL_THEMES[(lvl - 1) % LEVEL_THEMES.length];
+const DEFAULT_BG = LEVEL_THEMES[0].bg;
+
+// Game modes. "hasLevels" modes track progress per level; endless and snake are score-based.
+const MODES = {
+  endless: {
+    id: 'endless',
+    label: 'ENDLESS',
+    tagline: 'Classic. Chase the high score.',
+    glyph: '∞',
+    gradient: 'linear-gradient(135deg, #00d4ff, #a855f7)',
+    border: 'rgba(168,85,247,0.5)',
+    hasLevels: false,
+  },
+  goal: {
+    id: 'goal',
+    label: 'BLOCK GOAL',
+    tagline: 'Clear a target number of blocks.',
+    glyph: '◆',
+    gradient: 'linear-gradient(135deg, #22d65f, #00d4ff)',
+    border: 'rgba(34,214,95,0.5)',
+    hasLevels: true,
+    levelConfig: (lvl) => ({
+      target: 25 + Math.floor(lvl * 12),
+      label: `Clear ${25 + Math.floor(lvl * 12)} blocks`,
+    }),
+  },
+  timed: {
+    id: 'timed',
+    label: 'TIMED',
+    tagline: 'Hit the score target before time runs out.',
+    glyph: '◷',
+    gradient: 'linear-gradient(135deg, #ff7b2e, #ff2e6e)',
+    border: 'rgba(255,123,46,0.5)',
+    hasLevels: true,
+    levelConfig: (lvl) => ({
+      target: 400 + lvl * 300,
+      seconds: 90,
+      label: `${400 + lvl * 300} points in 90s`,
+    }),
+  },
+  treasure: {
+    id: 'treasure',
+    label: 'TREASURE',
+    tagline: 'Clear all gems on a pre-filled board.',
+    glyph: '★',
+    gradient: 'linear-gradient(135deg, #ffd60a, #ff7b2e)',
+    border: 'rgba(255,214,10,0.5)',
+    hasLevels: true,
+    levelConfig: (lvl) => ({
+      gems: Math.min(3 + lvl, 12),
+      prefillDensity: Math.min(0.15 + lvl * 0.02, 0.35),
+      label: `Clear ${Math.min(3 + lvl, 12)} gems`,
+    }),
+  },
+  snake: {
+    id: 'snake',
+    label: 'SNAKE',
+    tagline: 'Bonus mode. Classic snake on the grid.',
+    glyph: '◉',
+    gradient: 'linear-gradient(135deg, #22d65f, #0d8f3a)',
+    border: 'rgba(34,214,95,0.5)',
+    hasLevels: false,
+    alt: true,
+  },
+};
+const MODE_LIST = ['endless', 'goal', 'timed', 'treasure', 'snake'];
+
 const rand = () => Math.random().toString(36).slice(2, 9);
 const makePiece = () => ({
   id: rand(),
@@ -140,14 +219,14 @@ function mulColor(mul) {
   return '#a855f7';
 }
 
-function Block({ color, size, clearing, ghost, fresh, powerup }) {
+function Block({ color, size, clearing, ghost, fresh, powerup, fill }) {
   const c = color;
   return (
     <div
       style={{
         position: 'relative',
-        width: size,
-        height: size,
+        width: fill ? '100%' : size,
+        height: fill ? '100%' : size,
         background: ghost
           ? `linear-gradient(135deg, ${c.light}55, ${c.main}44)`
           : `linear-gradient(135deg, ${c.light} 0%, ${c.main} 55%, ${c.dark} 100%)`,
@@ -189,7 +268,7 @@ function TrayPiece({ piece, faded, onPointerDown, slotSize, enterKey }) {
   if (!piece) return <div style={{ width: '100%', aspectRatio: '1 / 1' }} />;
   const d = dims(piece.cells);
   const maxDim = Math.max(d.rows, d.cols);
-  const cell = Math.min(slotSize / (maxDim + 0.5), 22);
+  const cell = Math.min(slotSize / (maxDim + 0.5), 32);
   const w = d.cols * cell;
   const h = d.rows * cell;
   return (
@@ -252,12 +331,290 @@ export default function App() {
   const [nowTick, setNowTick] = useState(Date.now());
 
   // POWER PLACER: single-use charge that flood-fills the entire connected
-  // cluster when the next piece is placed. Earned randomly every 10–30 points.
+  // cluster when the next piece is placed. Earned randomly (3% per placement) or from shop.
   const [powerPlacerCharges, setPowerPlacerCharges] = useState(0);
   const [powerPlacerPending, setPowerPlacerPending] = useState(false);
-  const [nextPowerupScore, setNextPowerupScore] = useState(() =>
-    10 + Math.floor(Math.random() * 21)
-  );
+
+  // SNAKE: retro snake minigame that eats blocks off the board
+  const [snakeCharges, setSnakeCharges] = useState(0);
+  const [snakeActive, setSnakeActive] = useState(false);
+  const [snakeBody, setSnakeBody] = useState([]);      // [{r,c}], head first
+  const [snakeDir, setSnakeDir] = useState('right');
+  const [snakeEaten, setSnakeEaten] = useState(0);
+  const [snakeScore, setSnakeScore] = useState(0);
+  const snakeBodyRef = useRef([]);
+  const snakeDirRef = useRef('right');
+  const snakeQueuedRef = useRef(null);
+  const snakeActiveRef = useRef(false);
+  const snakeEatenRef = useRef(0);
+  const snakeScoreRef = useRef(0);
+  const snakeSwipeStartRef = useRef(null);
+
+  // META state (persists across games via window.storage)
+  const [screen, setScreen] = useState('menu'); // 'menu' | 'game' | 'shop' | 'stats'
+  const [coins, setCoins] = useState(0);
+  const [persistedBest, setPersistedBest] = useState(0);
+  const [gamesPlayed, setGamesPlayed] = useState(0);
+  const [lifetimeClears, setLifetimeClears] = useState(0);
+  const [lifetimeCoinsEarned, setLifetimeCoinsEarned] = useState(0);
+  const [lastDailyClaim, setLastDailyClaim] = useState(0);
+  const [metaLoaded, setMetaLoaded] = useState(false);
+  const [coinsEarnedThisGame, setCoinsEarnedThisGame] = useState(0);
+  const [usedContinue, setUsedContinue] = useState(false); // only one continue per game
+
+  // NEW addictive systems
+  const [xp, setXp] = useState(0);
+  const [playStreak, setPlayStreak] = useState(0);
+  const [lastPlayDate, setLastPlayDate] = useState(0);
+  const [celebration, setCelebration] = useState(null); // full-screen banner
+  const [flyingCoins, setFlyingCoins] = useState([]);
+  const [milestonesHit, setMilestonesHit] = useState([]);
+  const xpRef = useRef(0);
+  const streakCheckedRef = useRef(false); // only check streak once per session
+
+  // GAME MODES
+  const [mode, setMode] = useState('endless'); // 'endless' | 'goal' | 'timed' | 'treasure' | 'snake'
+  const [modeLevel, setModeLevel] = useState(1);
+  const [levelBlocks, setLevelBlocks] = useState(0); // blocks cleared this level (goal mode)
+  const [timeRemaining, setTimeRemaining] = useState(0); // seconds, timed mode
+  const [levelComplete, setLevelComplete] = useState(false);
+  // Persistent: highest level reached per mode
+  const [modeProgress, setModeProgress] = useState({ goal: 1, timed: 1, treasure: 1 });
+  const [modeBests, setModeBests] = useState({ endless: 0, snake: 0 }); // high scores for score modes
+  const modeRef = useRef('endless');
+  useEffect(() => { modeRef.current = mode; }, [mode]);
+
+  // Load persisted state once on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const keys = ['coins','best','gamesPlayed','lifetimeClears','lifetimeCoins','lastDaily','pp','od','muted','xp','streak','lastPlay','snake'];
+        const vals = await Promise.all(keys.map(k => window.storage.get(k).catch(() => null)));
+        const get = (i) => vals[i]?.value;
+        if (get(0) != null) setCoins(parseInt(get(0)) || 0);
+        if (get(1) != null) { const b = parseInt(get(1)) || 0; setPersistedBest(b); setBest(b); }
+        if (get(2) != null) setGamesPlayed(parseInt(get(2)) || 0);
+        if (get(3) != null) setLifetimeClears(parseInt(get(3)) || 0);
+        if (get(4) != null) setLifetimeCoinsEarned(parseInt(get(4)) || 0);
+        if (get(5) != null) setLastDailyClaim(parseInt(get(5)) || 0);
+        if (get(6) != null) setPowerPlacerCharges(parseInt(get(6)) || 0);
+        if (get(7) != null) setOverdriveCharges(parseInt(get(7)) || 2);
+        if (get(8) === 'false') setMuted(false);
+        if (get(9) != null) { const x = parseInt(get(9)) || 0; setXp(x); xpRef.current = x; }
+        if (get(10) != null) setPlayStreak(parseInt(get(10)) || 0);
+        if (get(11) != null) setLastPlayDate(parseInt(get(11)) || 0);
+        if (get(12) != null) setSnakeCharges(parseInt(get(12)) || 0);
+        // Mode progress + bests
+        const mp = await window.storage.get('modeProgress').catch(() => null);
+        if (mp?.value) { try { setModeProgress({ ...{ goal:1, timed:1, treasure:1 }, ...JSON.parse(mp.value) }); } catch {} }
+        const mb = await window.storage.get('modeBests').catch(() => null);
+        if (mb?.value) { try { setModeBests({ ...{ endless:0, snake:0 }, ...JSON.parse(mb.value) }); } catch {} }
+      } catch {}
+      setMetaLoaded(true);
+    })();
+  }, []);
+
+  // Save on change (debounced-ish via simple fire-and-forget)
+  useEffect(() => { if (metaLoaded) window.storage.set('coins', String(coins)).catch(() => {}); }, [coins, metaLoaded]);
+  useEffect(() => { if (metaLoaded) window.storage.set('best', String(persistedBest)).catch(() => {}); }, [persistedBest, metaLoaded]);
+  useEffect(() => { if (metaLoaded) window.storage.set('gamesPlayed', String(gamesPlayed)).catch(() => {}); }, [gamesPlayed, metaLoaded]);
+  useEffect(() => { if (metaLoaded) window.storage.set('lifetimeClears', String(lifetimeClears)).catch(() => {}); }, [lifetimeClears, metaLoaded]);
+  useEffect(() => { if (metaLoaded) window.storage.set('lifetimeCoins', String(lifetimeCoinsEarned)).catch(() => {}); }, [lifetimeCoinsEarned, metaLoaded]);
+  useEffect(() => { if (metaLoaded) window.storage.set('lastDaily', String(lastDailyClaim)).catch(() => {}); }, [lastDailyClaim, metaLoaded]);
+  useEffect(() => { if (metaLoaded) window.storage.set('pp', String(powerPlacerCharges)).catch(() => {}); }, [powerPlacerCharges, metaLoaded]);
+  useEffect(() => { if (metaLoaded) window.storage.set('od', String(overdriveCharges)).catch(() => {}); }, [overdriveCharges, metaLoaded]);
+  useEffect(() => { if (metaLoaded) window.storage.set('muted', muted ? 'true' : 'false').catch(() => {}); }, [muted, metaLoaded]);
+  useEffect(() => { if (metaLoaded) window.storage.set('xp', String(xp)).catch(() => {}); }, [xp, metaLoaded]);
+  useEffect(() => { if (metaLoaded) window.storage.set('streak', String(playStreak)).catch(() => {}); }, [playStreak, metaLoaded]);
+  useEffect(() => { if (metaLoaded) window.storage.set('lastPlay', String(lastPlayDate)).catch(() => {}); }, [lastPlayDate, metaLoaded]);
+  useEffect(() => { if (metaLoaded) window.storage.set('snake', String(snakeCharges)).catch(() => {}); }, [snakeCharges, metaLoaded]);
+  useEffect(() => { if (metaLoaded) window.storage.set('modeProgress', JSON.stringify(modeProgress)).catch(() => {}); }, [modeProgress, metaLoaded]);
+  useEffect(() => { if (metaLoaded) window.storage.set('modeBests', JSON.stringify(modeBests)).catch(() => {}); }, [modeBests, metaLoaded]);
+
+  // Mirror best score up to persistedBest
+  useEffect(() => {
+    if (best > persistedBest) setPersistedBest(best);
+  }, [best, persistedBest]);
+
+  // Award end-of-game coin bonus and bump games played
+  useEffect(() => {
+    if (gameOver && metaLoaded) {
+      const bonus = Math.floor(score / 100);
+      if (bonus > 0) earnCoins(bonus);
+      setGamesPlayed(g => g + 1);
+    }
+  }, [gameOver]);
+
+  // Coin economy: earn coins while playing
+  const earnCoins = (amount, reason = '', x = null, y = null) => {
+    if (amount <= 0) return;
+    setCoins(c => c + amount);
+    setLifetimeCoinsEarned(v => v + amount);
+    setCoinsEarnedThisGame(v => v + amount);
+    // Visual: spawn flying coin particles
+    if (x !== null && y !== null) {
+      const count = Math.min(Math.max(1, Math.ceil(amount / 5)), 6);
+      for (let i = 0; i < count; i++) {
+        const id = `fc-${Date.now()}-${Math.random()}`;
+        const jitter = 40;
+        const fx = x + (Math.random() - 0.5) * jitter;
+        const fy = y + (Math.random() - 0.5) * jitter;
+        const delay = i * 60;
+        setTimeout(() => {
+          setFlyingCoins(list => [...list, { id, x: fx, y: fy }]);
+          setTimeout(() => setFlyingCoins(list => list.filter(c => c.id !== id)), 1000);
+        }, delay);
+      }
+    }
+  };
+
+  // XP / Level system
+  const XP_PER_LEVEL = 300;
+  const levelForXp = (x) => Math.floor(x / XP_PER_LEVEL) + 1;
+  const xpIntoLevel = (x) => x % XP_PER_LEVEL;
+  const playerLevel = levelForXp(xp);
+
+  const gainXp = (amount) => {
+    if (amount <= 0) return;
+    setXp(prev => {
+      const next = prev + amount;
+      const prevLvl = levelForXp(prev);
+      const nextLvl = levelForXp(next);
+      if (nextLvl > prevLvl) {
+        // Level up! Celebrate after a short delay
+        setTimeout(() => {
+          const bonus = nextLvl * 30;
+          triggerCelebration('LEVEL UP', `LEVEL ${nextLvl}`, bonus, 'level');
+          setCoins(c => c + bonus);
+          setLifetimeCoinsEarned(v => v + bonus);
+          setCoinsEarnedThisGame(v => v + bonus);
+        }, 400);
+      }
+      xpRef.current = next;
+      return next;
+    });
+  };
+
+  // Celebration banner trigger
+  const celebrationTimeoutRef = useRef(null);
+  const triggerCelebration = (title, subtext, bonus, type = 'default') => {
+    const id = Date.now() + Math.random();
+    setCelebration({ title, subtext, bonus, type, id });
+    if (celebrationTimeoutRef.current) clearTimeout(celebrationTimeoutRef.current);
+    celebrationTimeoutRef.current = setTimeout(() => {
+      setCelebration(c => (c?.id === id ? null : c));
+    }, 2400);
+    // Play audio sting — different for different types
+    if (!mutedRef.current && audioRef.current) {
+      try {
+        const ctx = audioRef.current;
+        if (ctx.state === 'suspended') ctx.resume();
+        const sequences = {
+          mega:    [523, 659, 784, 1047, 1319, 1568],
+          perfect: [523, 659, 784, 1047, 1319, 1568, 2093],
+          level:   [392, 494, 587, 784, 988, 1175],
+          default: [523, 784, 1047, 1319],
+        };
+        const notes = sequences[type] || sequences.default;
+        notes.forEach((f, i) => setTimeout(() => {
+          playTone(f, 0.22, 'triangle', 0.16);
+          if (type === 'perfect' || type === 'mega') playTone(f * 2, 0.12, 'sine', 0.08);
+        }, i * 55));
+      } catch {}
+    }
+    vibe(type === 'perfect' || type === 'mega' ? [40, 20, 40, 20, 80] : [30, 15, 60]);
+  };
+
+  // Play streak check — call once per session on game start
+  const checkPlayStreak = () => {
+    if (streakCheckedRef.current || !metaLoaded) return;
+    streakCheckedRef.current = true;
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    const today = d.getTime();
+    if (lastPlayDate === today) return; // already counted today
+    const yesterday = today - 86400000;
+    let newStreak = 1;
+    if (lastPlayDate === yesterday) {
+      newStreak = playStreak + 1;
+      setPlayStreak(newStreak);
+    } else {
+      setPlayStreak(1);
+    }
+    setLastPlayDate(today);
+    const MILESTONES = { 3: 30, 7: 100, 14: 250, 30: 500, 60: 1000, 100: 2000 };
+    if (MILESTONES[newStreak]) {
+      setTimeout(() => {
+        const bonus = MILESTONES[newStreak];
+        triggerCelebration(`${newStreak}-DAY STREAK`, 'ON FIRE', bonus, 'level');
+        setCoins(c => c + bonus);
+        setLifetimeCoinsEarned(v => v + bonus);
+      }, 800);
+    }
+  };
+
+  const DAY_MS = 86400000;
+  const canClaimDaily = Date.now() - lastDailyClaim >= DAY_MS;
+  const DAILY_BONUS = 50;
+  const claimDaily = () => {
+    if (!canClaimDaily) return;
+    setCoins(c => c + DAILY_BONUS);
+    setLifetimeCoinsEarned(v => v + DAILY_BONUS);
+    setLastDailyClaim(Date.now());
+    if (!mutedRef.current && audioRef.current) {
+      try {
+        const notes = [523, 659, 784, 1047];
+        notes.forEach((f, i) => setTimeout(() => playTone(f, 0.18, 'triangle', 0.15), i * 80));
+      } catch {}
+    }
+  };
+
+  // Shop items
+  const SHOP = [
+    { id: 'pp', label: 'POWER PLACER', glyph: '💥', price: 25, desc: 'Flood-clears connected blocks',
+      buy: () => setPowerPlacerCharges(c => c + 1) },
+    { id: 'snake', label: 'SNAKE', glyph: '🐍', price: 80, desc: 'Control a snake that eats blocks',
+      buy: () => setSnakeCharges(c => c + 1) },
+    { id: 'od', label: 'OVERDRIVE', glyph: '⚡', price: 120, desc: '10s of auto-optimal placement',
+      buy: () => setOverdriveCharges(c => Math.min(OVERDRIVE_MAX, c + 1)) },
+  ];
+
+  const buyItem = (item) => {
+    if (coins < item.price) return;
+    setCoins(c => c - item.price);
+    item.buy();
+    if (!mutedRef.current && audioRef.current) {
+      try {
+        playTone(784, 0.1, 'triangle', 0.14);
+        setTimeout(() => playTone(1047, 0.14, 'sine', 0.1), 60);
+      } catch {}
+    }
+  };
+
+  // CONTINUE after game-over: spend coins for a free Overdrive to recover
+  const CONTINUE_COST = 50;
+  const canContinue = !usedContinue && coins >= CONTINUE_COST;
+  const continueGame = () => {
+    if (!canContinue) return;
+    setCoins(c => c - CONTINUE_COST);
+    setUsedContinue(true);
+    setGameOver(false);
+    // Grant 10s of overdrive so they can rescue themselves
+    setOverdriveEndsAt(Date.now() + OVERDRIVE_DURATION_MS);
+    setNowTick(Date.now());
+    if (!mutedRef.current && audioRef.current) {
+      try {
+        const notes = [261.63, 329.63, 392, 523.25, 659.25];
+        for (let i = 0; i < notes.length; i++) {
+          setTimeout(() => {
+            playTone(notes[i], 0.22, 'triangle', 0.16);
+            playTone(notes[i] * 2, 0.12, 'sine', 0.08);
+          }, i * 55);
+        }
+      } catch {}
+    }
+    vibe([60, 30, 80, 30, 100]);
+  };
 
   const boardRef = useRef(null);
   const audioRef = useRef(null);
@@ -590,11 +947,22 @@ export default function App() {
     setPopups([]);
     setParticles([]);
     setFreshCells(new Set());
-    setOverdriveCharges(2);
     setOverdriveEndsAt(null);
-    setPowerPlacerCharges(0);
     setPowerPlacerPending(false);
-    setNextPowerupScore(10 + Math.floor(Math.random() * 21));
+    setCoinsEarnedThisGame(0);
+    setUsedContinue(false);
+    setMilestonesHit([]);
+    setCelebration(null);
+    // Snake state
+    setSnakeActive(false);
+    snakeActiveRef.current = false;
+    setSnakeBody([]);
+    snakeBodyRef.current = [];
+    setSnakeEaten(0);
+    snakeEatenRef.current = 0;
+    setSnakeScore(0);
+    snakeScoreRef.current = 0;
+    snakeQueuedRef.current = null;
   };
 
   const addPopup = (value, mul, lines, pwrMult) => {
@@ -684,6 +1052,7 @@ export default function App() {
         }
         // Game-over check deferred — if board is now unwinnable, end the game
         setTimeout(() => {
+          if (snakeActiveRef.current) return;
           setTray(curTray => {
             setBoard(curBoard => {
               if (!curTray.filter(Boolean).some(p => canFit(p, curBoard))) {
@@ -834,6 +1203,273 @@ export default function App() {
     }
   };
 
+  // ---------- SNAKE: retro snake minigame powerup ----------
+  const SNAKE_TICK_MS = 320;
+  const OPPOSITE = { up: 'down', down: 'up', left: 'right', right: 'left' };
+  const DIR_DELTA = { up: [-1, 0], down: [1, 0], left: [0, -1], right: [0, 1] };
+
+  const activateSnake = () => {
+    if (snakeCharges <= 0 || snakeActive || gameOver || overdriveActive || powerPlacerPending) return;
+    // Need at least one block to be worth eating
+    const hasBlocks = board.some(row => row.some(cell => !!cell));
+    if (!hasBlocks) {
+      setToast('NO BLOCKS TO EAT');
+      setTimeout(() => setToast(null), 1400);
+      if (!mutedRef.current && audioRef.current) {
+        try { playTone(220, 0.16, 'sawtooth', 0.1); } catch {}
+      }
+      return;
+    }
+    initAudio();
+    setSnakeCharges(c => c - 1);
+
+    // Find a good starting row: one with the most empty cells
+    let bestRow = 3, bestEmpty = -1;
+    for (let r = 0; r < GRID; r++) {
+      const e = board[r].filter(c => !c).length;
+      if (e > bestEmpty) { bestEmpty = e; bestRow = r; }
+    }
+    // Find 3 consecutive empty columns in that row; fall back to cols 2-4
+    let startC = 2;
+    for (let c = 0; c <= GRID - 3; c++) {
+      if (!board[bestRow][c] && !board[bestRow][c+1] && !board[bestRow][c+2]) {
+        startC = c;
+        break;
+      }
+    }
+    const body = [
+      { r: bestRow, c: startC + 2 }, // head
+      { r: bestRow, c: startC + 1 },
+      { r: bestRow, c: startC },      // tail
+    ];
+    // If any starting cell had a block, clear it (freebie eat)
+    setBoard(b => {
+      const nb = b.map(row => [...row]);
+      let freebies = 0;
+      for (const seg of body) {
+        if (nb[seg.r][seg.c]) { nb[seg.r][seg.c] = null; freebies++; }
+      }
+      if (freebies > 0) {
+        snakeEatenRef.current = freebies;
+        setSnakeEaten(freebies);
+        snakeScoreRef.current = freebies * 10;
+        setSnakeScore(freebies * 10);
+      }
+      return nb;
+    });
+    snakeBodyRef.current = body;
+    setSnakeBody(body);
+    snakeDirRef.current = 'right';
+    setSnakeDir('right');
+    snakeQueuedRef.current = null;
+    snakeActiveRef.current = true;
+    setSnakeActive(true);
+
+    setToast('SWIPE TO STEER');
+    setTimeout(() => setToast(null), 1800);
+
+    // Fanfare — snake-charmer motif
+    if (!mutedRef.current && audioRef.current) {
+      try {
+        const ctx = audioRef.current;
+        if (ctx.state === 'suspended') ctx.resume();
+        [392, 466, 523, 659, 784].forEach((f, i) => setTimeout(() => {
+          playTone(f, 0.22, 'sawtooth', 0.14);
+          playTone(f * 0.5, 0.18, 'sine', 0.08);
+        }, i * 70));
+      } catch {}
+    }
+    vibe([40, 20, 40, 20, 80]);
+  };
+
+  const endSnake = (perfectClear = false) => {
+    snakeActiveRef.current = false;
+    setSnakeActive(false);
+    const eaten = snakeEatenRef.current;
+    const snakeScore = snakeScoreRef.current;
+
+    // Transfer snake score to main score
+    if (snakeScore > 0) {
+      setScore(s => {
+        const ns = s + snakeScore;
+        setBest(b => Math.max(b, ns));
+        return ns;
+      });
+    }
+    // Reward coins and celebrate based on how many blocks eaten
+    const coinReward = Math.max(0, eaten * 3);
+    const rect = boardRef.current?.getBoundingClientRect();
+    const cx = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+    const cy = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
+
+    if (perfectClear) {
+      const bonus = 300 + eaten * 3;
+      triggerCelebration('PERFECT!', `SNAKE CLEARED BOARD · ${eaten}`, bonus, 'perfect');
+      earnCoins(bonus, '', cx, cy);
+    } else if (eaten >= 20) {
+      triggerCelebration('SNAKE MASTER', `ATE ${eaten} BLOCKS`, coinReward + 50, 'mega');
+      earnCoins(coinReward + 50, '', cx, cy);
+    } else if (eaten >= 10) {
+      triggerCelebration('SNAKE!', `ATE ${eaten} BLOCKS`, coinReward + 15, 'level');
+      earnCoins(coinReward + 15, '', cx, cy);
+    } else if (eaten > 0) {
+      triggerCelebration('SNAKE DONE', `ATE ${eaten}`, coinReward);
+      earnCoins(coinReward, '', cx, cy);
+    }
+
+    // Audio: ascending triumphant fanfare on perfect, descending sawtooth on tail-bite
+    if (!mutedRef.current && audioRef.current) {
+      try {
+        if (perfectClear) {
+          const notes = [392, 523, 659, 784, 988, 1175, 1568];
+          notes.forEach((f, i) => setTimeout(() => {
+            playTone(f, 0.22, 'triangle', 0.16);
+            playTone(f * 2, 0.12, 'sine', 0.08);
+          }, i * 70));
+        } else {
+          [784, 659, 523, 392].forEach((f, i) => setTimeout(() => playTone(f, 0.18, 'sawtooth', 0.12), i * 80));
+        }
+      } catch {}
+    }
+    vibe(perfectClear ? [40, 20, 40, 20, 80, 40, 160] : [60, 30, 100]);
+
+    // Clear snake state after a beat
+    setTimeout(() => {
+      setSnakeBody([]);
+      snakeBodyRef.current = [];
+      setSnakeEaten(0);
+      snakeEatenRef.current = 0;
+      setSnakeScore(0);
+      snakeScoreRef.current = 0;
+      snakeQueuedRef.current = null;
+    }, 800);
+  };
+
+  const snakeTick = () => {
+    if (!snakeActiveRef.current) return;
+
+    // Resolve direction (queued if not directly opposite)
+    const currentDir = snakeDirRef.current;
+    const queued = snakeQueuedRef.current;
+    let newDir = currentDir;
+    if (queued && queued !== OPPOSITE[currentDir]) newDir = queued;
+    snakeDirRef.current = newDir;
+    snakeQueuedRef.current = null;
+    setSnakeDir(newDir);
+
+    const body = snakeBodyRef.current;
+    if (!body.length) return;
+    const head = body[0];
+    const [dr, dc] = DIR_DELTA[newDir];
+    let nr = head.r + dr, nc = head.c + dc;
+    // Wrap around edges (more forgiving and more fun)
+    if (nr < 0) nr = GRID - 1;
+    if (nr >= GRID) nr = 0;
+    if (nc < 0) nc = GRID - 1;
+    if (nc >= GRID) nc = 0;
+
+    const willEat = !!board[nr][nc];
+    // If eating, tail stays → head may collide with tail; if not eating, tail moves → exclude tail from check
+    const collideList = willEat ? body : body.slice(0, -1);
+    const bit = collideList.some(s => s.r === nr && s.c === nc);
+    if (bit) {
+      // Head ate its own body — snake ends
+      endSnake();
+      return;
+    }
+
+    // Move: prepend new head
+    const newBody = [{ r: nr, c: nc }, ...body];
+    if (!willEat) newBody.pop();
+
+    if (willEat) {
+      // Eat the block: remove from board, bump counters, pop sound, coin drop
+      setBoard(b => {
+        const nb = b.map(row => [...row]);
+        nb[nr][nc] = null;
+        return nb;
+      });
+      snakeEatenRef.current += 1;
+      setSnakeEaten(e => e + 1);
+      snakeScoreRef.current += 10;
+      setSnakeScore(s => s + 10);
+      // Coin drop at eaten cell
+      const rect = boardRef.current?.getBoundingClientRect();
+      if (rect && boardCell) {
+        const x = rect.left + 6 + nc * (rect.width - 12) / GRID + (rect.width - 12) / GRID / 2;
+        const y = rect.top + 6 + nr * (rect.height - 12) / GRID + (rect.height - 12) / GRID / 2;
+        earnCoins(1, '', x, y);
+      } else {
+        earnCoins(1);
+      }
+      if (!mutedRef.current && audioRef.current) {
+        try {
+          playTone(660 + Math.min(snakeEatenRef.current * 20, 600), 0.06, 'square', 0.12);
+        } catch {}
+      }
+      vibe(10);
+
+      // If this eat was the last block on the board, end with PERFECT celebration
+      let anyRemaining = false;
+      for (let r = 0; r < GRID && !anyRemaining; r++) {
+        for (let c = 0; c < GRID; c++) {
+          if (r === nr && c === nc) continue; // just ate this one
+          if (board[r][c]) { anyRemaining = true; break; }
+        }
+      }
+      if (!anyRemaining) {
+        // Still commit the body update so the final eat animates naturally
+        snakeBodyRef.current = newBody;
+        setSnakeBody(newBody);
+        setTimeout(() => {
+          if (snakeActiveRef.current) endSnake(true);
+        }, 450);
+        return;
+      }
+    } else {
+      // Soft tick sound
+      if (!mutedRef.current && audioRef.current) {
+        try {
+          playTone(220, 0.03, 'sine', 0.04);
+        } catch {}
+      }
+    }
+
+    snakeBodyRef.current = newBody;
+    setSnakeBody(newBody);
+  };
+
+  // Snake tick interval
+  useEffect(() => {
+    if (!snakeActive) return;
+    const id = setInterval(snakeTick, SNAKE_TICK_MS);
+    return () => clearInterval(id);
+  }, [snakeActive]);
+
+  // Snake swipe handlers (attached to board container while active)
+  const snakeSwipe = {
+    onPointerDown: (e) => {
+      if (!snakeActiveRef.current) return;
+      snakeSwipeStartRef.current = { x: e.clientX, y: e.clientY };
+    },
+    onPointerMove: (e) => {
+      if (!snakeActiveRef.current) return;
+      const start = snakeSwipeStartRef.current;
+      if (!start) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+      const absX = Math.abs(dx), absY = Math.abs(dy);
+      if (Math.max(absX, absY) < 22) return;
+      const dir = absX > absY ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+      if (dir !== OPPOSITE[snakeDirRef.current]) {
+        snakeQueuedRef.current = dir;
+      }
+      snakeSwipeStartRef.current = { x: e.clientX, y: e.clientY };
+    },
+    onPointerUp: () => { snakeSwipeStartRef.current = null; },
+    onPointerCancel: () => { snakeSwipeStartRef.current = null; },
+  };
+
   // DANGER: at least one placement the player could make right now would leave
   // NO remaining tray piece able to fit anywhere (immediate game over on next placement)
   // Suppressed during overdrive since placement is always possible then.
@@ -977,7 +1613,55 @@ export default function App() {
       const base = totalCellsCleared * 2;
       clearPts = Math.round(base * streakMult * powerupMult);
       pts += clearPts;
-      if (lines > 0) setClearCount(c => c + lines);
+      if (lines > 0) {
+        setClearCount(c => c + lines);
+        setLifetimeClears(v => v + lines);
+      }
+      // Earn coins: 1 per cleared cell + CASCADE bonus + combo bonus
+      const coinReward = Math.ceil(totalCellsCleared / 2)
+        + (lines >= 3 ? 10 : 0)
+        + (lines >= 2 ? 3 : 0)
+        + (triggeredPowerPlacer ? Math.ceil(totalCellsCleared / 3) : 0);
+      if (coinReward > 0) {
+        const rect = boardRef.current?.getBoundingClientRect();
+        const cx = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+        const cy = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
+        earnCoins(coinReward, '', cx, cy);
+      }
+
+      // MEGA CASCADE: 4+ lines at once
+      if (lines >= 4) {
+        setTimeout(() => {
+          const megaBonus = 50 + lines * 15;
+          triggerCelebration('MEGA CASCADE', `${lines} LINES · ×${streakMult}`, megaBonus, 'mega');
+          const rect = boardRef.current?.getBoundingClientRect();
+          const cx = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+          const cy = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
+          earnCoins(megaBonus, '', cx, cy);
+        }, 350);
+      }
+
+      // PERFECT CLEAR: board becomes fully empty after this clear
+      // (next is the board with placed cells; subtract what's being cleared)
+      let anyRemaining = false;
+      for (let r = 0; r < GRID && !anyRemaining; r++) {
+        for (let c = 0; c < GRID; c++) {
+          if (next[r][c] && !clearMask.has(`${r},${c}`)) {
+            anyRemaining = true;
+            break;
+          }
+        }
+      }
+      if (!anyRemaining) {
+        setTimeout(() => {
+          const perfectBonus = 250;
+          triggerCelebration('PERFECT!', 'BOARD CLEARED', perfectBonus, 'perfect');
+          const rect = boardRef.current?.getBoundingClientRect();
+          const cx = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+          const cy = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
+          earnCoins(perfectBonus, '', cx, cy);
+        }, 650);
+      }
     }
 
     setScore(s => {
@@ -997,24 +1681,55 @@ export default function App() {
       if (newThr > oldThr) {
         setOverdriveCharges(c => Math.min(OVERDRIVE_MAX, c + (newThr - oldThr)));
       }
-      // POWER PLACER GRANTS: every 10–30 score points
-      if (ns >= nextPowerupScore) {
-        setPowerPlacerCharges(c => c + 1);
-        setNextPowerupScore(ns + 10 + Math.floor(Math.random() * 21));
-        setTimeout(() => {
-          setToast('POWER PLACER +1');
-          setTimeout(() => setToast(null), 1000);
-          if (!mutedRef.current && audioRef.current) {
-            try {
-              playTone(523, 0.1, 'triangle', 0.14);
-              setTimeout(() => playTone(784, 0.12, 'triangle', 0.12), 70);
-              setTimeout(() => playTone(1047, 0.16, 'sine', 0.1), 150);
-            } catch {}
-          }
-        }, 500);
+      // Gain XP = 1 per 5 points of score
+      const xpGain = Math.floor(ns / 5) - Math.floor(s / 5);
+      if (xpGain > 0) gainXp(xpGain);
+      // Score milestone celebrations
+      const MILESTONES = [1000, 2500, 5000, 10000, 25000, 50000, 100000];
+      for (const m of MILESTONES) {
+        if (ns >= m && s < m) {
+          setTimeout(() => {
+            const bonus = 20 + Math.floor(m / 1000) * 5;
+            triggerCelebration(`${m.toLocaleString()} POINTS`, 'MILESTONE', bonus);
+            const rect = boardRef.current?.getBoundingClientRect();
+            const cx = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+            const cy = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
+            earnCoins(bonus, '', cx, cy);
+          }, 800);
+        }
       }
       return ns;
     });
+    // 3% chance per placement to grant a Power Placer
+    if (Math.random() < 0.03) {
+      setPowerPlacerCharges(c => c + 1);
+      setTimeout(() => {
+        setToast('POWER PLACER +1');
+        setTimeout(() => setToast(null), 1000);
+        if (!mutedRef.current && audioRef.current) {
+          try {
+            playTone(523, 0.1, 'triangle', 0.14);
+            setTimeout(() => playTone(784, 0.12, 'triangle', 0.12), 70);
+            setTimeout(() => playTone(1047, 0.16, 'sine', 0.1), 150);
+          } catch {}
+        }
+      }, 500);
+    }
+    // 1% chance per placement to grant a Snake charge (rarer)
+    else if (Math.random() < 0.01) {
+      setSnakeCharges(c => c + 1);
+      setTimeout(() => {
+        setToast('🐍 SNAKE +1');
+        setTimeout(() => setToast(null), 1200);
+        if (!mutedRef.current && audioRef.current) {
+          try {
+            playTone(392, 0.12, 'sawtooth', 0.14);
+            setTimeout(() => playTone(587, 0.14, 'sawtooth', 0.12), 80);
+            setTimeout(() => playTone(784, 0.18, 'sine', 0.1), 170);
+          } catch {}
+        }
+      }, 500);
+    }
     // Bonus charge for big clears
     if (lines >= 3) {
       setOverdriveCharges(c => Math.min(OVERDRIVE_MAX, c + 1));
@@ -1139,7 +1854,7 @@ export default function App() {
           setTrayKey(k => k + 1);
           playTone(520, 0.12, 'triangle', 0.15);
         }
-        if (!overdriveActive && !finalTray.filter(Boolean).some(p => canFit(p, cleared))) {
+        if (!overdriveActive && !snakeActive && !finalTray.filter(Boolean).some(p => canFit(p, cleared))) {
           setTimeout(() => {
             setGameOver(true);
             playSweep(440, 90, 0.8);
@@ -1154,7 +1869,7 @@ export default function App() {
         setTrayKey(k => k + 1);
         playTone(520, 0.12, 'triangle', 0.15);
       }
-      if (!overdriveActive && !finalTray.filter(Boolean).some(p => canFit(p, next))) {
+      if (!overdriveActive && !snakeActive && !finalTray.filter(Boolean).some(p => canFit(p, next))) {
         setTimeout(() => {
           setGameOver(true);
           playSweep(440, 90, 0.8);
@@ -1285,6 +2000,618 @@ export default function App() {
   if (clearing.extra) for (const k of clearing.extra) clearSet.add(k);
 
   const mcolor = mulColor(multiplier);
+
+  // Shared shell style for all screens
+  const shellStyle = {
+    minHeight: '100vh',
+    width: '100%',
+    background: 'radial-gradient(ellipse at top, #1a1440 0%, #0a0818 55%, #050410 100%)',
+    color: '#fff',
+    fontFamily: '"Rubik", system-ui, sans-serif',
+    touchAction: 'manipulation',
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+    overflow: 'hidden',
+    position: 'relative',
+  };
+
+  const fontsAndKeyframes = (
+    <style>{`
+      @import url('https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Rubik:wght@400;500;700;900&display=swap');
+      @keyframes titleGlow {
+        0%, 100% { filter: drop-shadow(0 0 30px rgba(168,85,247,0.5)); }
+        50% { filter: drop-shadow(0 0 50px rgba(0,212,255,0.6)); }
+      }
+      @keyframes menuPulse {
+        0%, 100% { transform: scale(1); box-shadow: 0 10px 40px rgba(168,85,247,0.4); }
+        50% { transform: scale(1.02); box-shadow: 0 14px 50px rgba(168,85,247,0.6); }
+      }
+      @keyframes coinBob {
+        0%, 100% { transform: translateY(0) rotate(-2deg); }
+        50% { transform: translateY(-3px) rotate(2deg); }
+      }
+      @keyframes dailyGlow {
+        0%, 100% { box-shadow: 0 0 0 2px rgba(255,214,10,0.5), 0 0 30px rgba(255,214,10,0.4); }
+        50% { box-shadow: 0 0 0 3px rgba(255,214,10,0.8), 0 0 50px rgba(255,214,10,0.7); }
+      }
+      @keyframes celebrationIn {
+        0% { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+        60% { transform: scale(1.15) rotate(2deg); opacity: 1; }
+        100% { transform: scale(1) rotate(0); opacity: 1; }
+      }
+      @keyframes celebrationPulse {
+        0%, 100% { filter: drop-shadow(0 0 30px rgba(255,123,46,0.8)); }
+        50% { filter: drop-shadow(0 0 60px rgba(255,46,110,1)); }
+      }
+      @keyframes celebrationFadeOut {
+        to { transform: scale(0.7) translateY(-20px); opacity: 0; }
+      }
+      @keyframes coinFly {
+        0% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+        12% { transform: translate(0, -30px) scale(1.4); opacity: 1; }
+        100% { transform: translate(0, -240px) scale(0.5); opacity: 0; }
+      }
+      @keyframes megaFlash {
+        0%, 100% { opacity: 0; }
+        25% { opacity: 1; }
+      }
+      @keyframes xpBarFill {
+        from { filter: brightness(1); }
+        50% { filter: brightness(1.8); }
+        to { filter: brightness(1); }
+      }
+      @keyframes streakFlame {
+        0%, 100% { transform: rotate(-4deg) scale(1); }
+        50% { transform: rotate(4deg) scale(1.1); }
+      }
+      @keyframes snakeHeadPulse {
+        0%, 100% { transform: scale(1); filter: brightness(1); }
+        50% { transform: scale(1.08); filter: brightness(1.25); }
+      }
+      @keyframes snakeHudGlow {
+        0%, 100% { box-shadow: 0 0 14px rgba(34,214,95,0.4), 0 0 26px rgba(0,255,194,0.25); }
+        50% { box-shadow: 0 0 22px rgba(34,214,95,0.7), 0 0 40px rgba(0,255,194,0.4); }
+      }
+    `}</style>
+  );
+
+  const CoinBadge = ({ large }) => (
+    <div style={{
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 6,
+      padding: large ? '8px 16px' : '6px 12px',
+      background: 'linear-gradient(135deg, rgba(255,214,10,0.2), rgba(255,123,46,0.1))',
+      border: '1px solid rgba(255,214,10,0.4)',
+      borderRadius: 100,
+      fontFamily: '"Rubik Mono One", monospace',
+      fontSize: large ? 18 : 14,
+      color: '#ffd60a',
+      textShadow: '0 0 12px rgba(255,214,10,0.5)',
+    }}>
+      <span style={{ animation: 'coinBob 2s ease-in-out infinite', display: 'inline-block' }}>◉</span>
+      <span>{coins}</span>
+    </div>
+  );
+
+  // ------------------- MAIN MENU -------------------
+  if (screen === 'menu') {
+    return (
+      <div style={shellStyle}>
+        {fontsAndKeyframes}
+        <div style={{
+          padding: '40px 20px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 20,
+          minHeight: '100vh',
+          justifyContent: 'center',
+        }}>
+          {/* Top bar: coin balance */}
+          <div style={{ position: 'absolute', top: 20, right: 20 }}>
+            <CoinBadge />
+          </div>
+
+          {/* Title */}
+          <div style={{ marginBottom: 8, animation: 'titleGlow 3s ease-in-out infinite' }}>
+            <div style={{
+              fontFamily: '"Rubik Mono One", monospace',
+              fontSize: 64,
+              letterSpacing: '-0.03em',
+              lineHeight: 0.9,
+              textAlign: 'center',
+              background: 'linear-gradient(135deg, #00d4ff 0%, #a855f7 50%, #ff2e6e 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}>CASCADE</div>
+            <div style={{
+              fontSize: 11,
+              letterSpacing: '0.45em',
+              color: 'rgba(255,255,255,0.45)',
+              textAlign: 'center',
+              marginTop: 8,
+              fontWeight: 500,
+            }}>8 × 8 · DROP · CLEAR</div>
+          </div>
+
+          {/* Level + XP progress bar */}
+          <div style={{
+            width: '100%',
+            maxWidth: 320,
+            padding: '12px 16px',
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(168,85,247,0.25)',
+            borderRadius: 14,
+            marginBottom: 4,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+              <div style={{
+                fontFamily: '"Rubik Mono One", monospace',
+                fontSize: 16,
+                background: 'linear-gradient(135deg, #00d4ff, #a855f7, #ff2e6e)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+                letterSpacing: '0.05em',
+              }}>LVL {playerLevel}</div>
+              <div style={{
+                fontSize: 10,
+                color: 'rgba(255,255,255,0.5)',
+                fontFamily: '"Rubik Mono One", monospace',
+                letterSpacing: '0.08em',
+              }}>
+                {xpIntoLevel(xp)} / {XP_PER_LEVEL} XP
+              </div>
+            </div>
+            <div style={{
+              height: 6,
+              background: 'rgba(255,255,255,0.08)',
+              borderRadius: 3,
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                width: `${(xpIntoLevel(xp) / XP_PER_LEVEL) * 100}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #00d4ff, #a855f7, #ff2e6e)',
+                boxShadow: '0 0 10px rgba(168,85,247,0.6)',
+                transition: 'width 500ms ease',
+              }} />
+            </div>
+          </div>
+
+          {/* Play streak */}
+          {playStreak > 1 && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '6px 14px',
+              background: 'linear-gradient(135deg, rgba(255,123,46,0.22), rgba(255,46,110,0.15))',
+              border: '1px solid rgba(255,123,46,0.45)',
+              borderRadius: 100,
+              fontFamily: '"Rubik Mono One", monospace',
+              fontSize: 12,
+              color: '#ffd60a',
+              letterSpacing: '0.12em',
+              boxShadow: '0 0 16px rgba(255,123,46,0.25)',
+              marginBottom: 4,
+            }}>
+              <span style={{
+                fontSize: 14,
+                display: 'inline-block',
+                animation: 'streakFlame 1.1s ease-in-out infinite',
+              }}>🔥</span>
+              <span>{playStreak}-DAY STREAK</span>
+            </div>
+          )}
+
+          {/* Stats strip */}
+          <div style={{
+            display: 'flex',
+            gap: 14,
+            padding: '10px 16px',
+            background: 'rgba(255,255,255,0.03)',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: 14,
+            marginBottom: 8,
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 9, letterSpacing: '0.2em', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>BEST</div>
+              <div style={{ fontFamily: '"Rubik Mono One", monospace', fontSize: 18, color: '#fff' }}>
+                {persistedBest.toLocaleString()}
+              </div>
+            </div>
+            <div style={{ width: 1, background: 'rgba(255,255,255,0.08)' }} />
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 9, letterSpacing: '0.2em', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>GAMES</div>
+              <div style={{ fontFamily: '"Rubik Mono One", monospace', fontSize: 18, color: '#7aeaff' }}>
+                {gamesPlayed}
+              </div>
+            </div>
+            <div style={{ width: 1, background: 'rgba(255,255,255,0.08)' }} />
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 9, letterSpacing: '0.2em', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>CLEARS</div>
+              <div style={{ fontFamily: '"Rubik Mono One", monospace', fontSize: 18, color: '#cb91fb' }}>
+                {lifetimeClears}
+              </div>
+            </div>
+          </div>
+
+          {/* Daily bonus */}
+          {canClaimDaily && (
+            <button
+              onClick={() => { initAudio(); claimDaily(); }}
+              style={{
+                padding: '12px 24px',
+                fontFamily: '"Rubik Mono One", monospace',
+                fontSize: 13,
+                letterSpacing: '0.15em',
+                color: '#0a0818',
+                background: 'linear-gradient(135deg, #ffd60a, #ff7b2e)',
+                border: 'none',
+                borderRadius: 100,
+                cursor: 'pointer',
+                animation: 'dailyGlow 1.2s ease-in-out infinite',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 16 }}>🎁</span>
+              <span>DAILY +{DAILY_BONUS}</span>
+            </button>
+          )}
+
+          {/* PLAY — big primary button */}
+          <button
+            onClick={() => { initAudio(); reset(); checkPlayStreak(); setScreen('game'); }}
+            style={{
+              padding: '20px 60px',
+              fontFamily: '"Rubik Mono One", monospace',
+              fontSize: 22,
+              letterSpacing: '0.2em',
+              color: '#fff',
+              background: 'linear-gradient(135deg, #a855f7, #ff2e6e)',
+              border: 'none',
+              borderRadius: 100,
+              cursor: 'pointer',
+              animation: 'menuPulse 2.5s ease-in-out infinite',
+              minWidth: 240,
+            }}
+          >
+            PLAY
+          </button>
+
+          {/* Secondary row */}
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              onClick={() => setScreen('shop')}
+              style={{
+                padding: '12px 26px',
+                fontFamily: '"Rubik Mono One", monospace',
+                fontSize: 13,
+                letterSpacing: '0.15em',
+                color: '#fff',
+                background: 'linear-gradient(135deg, rgba(0,212,255,0.2), rgba(168,85,247,0.15))',
+                border: '1px solid rgba(0,212,255,0.4)',
+                borderRadius: 100,
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >🛒 SHOP</button>
+            <button
+              onClick={() => setScreen('stats')}
+              style={{
+                padding: '12px 26px',
+                fontFamily: '"Rubik Mono One", monospace',
+                fontSize: 13,
+                letterSpacing: '0.15em',
+                color: '#fff',
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 100,
+                cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >📊 STATS</button>
+            <button
+              onClick={() => {
+                initAudio();
+                setMuted(m => {
+                  const next = !m;
+                  if (!next && audioRef.current) {
+                    try {
+                      const ctx = audioRef.current;
+                      if (ctx.state === 'suspended') ctx.resume();
+                      const osc = ctx.createOscillator();
+                      const g = ctx.createGain();
+                      osc.type = 'sine';
+                      osc.frequency.setValueAtTime(523, ctx.currentTime);
+                      osc.frequency.setValueAtTime(784, ctx.currentTime + 0.08);
+                      g.gain.setValueAtTime(0, ctx.currentTime);
+                      g.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.01);
+                      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+                      osc.connect(g); g.connect(ctx.destination);
+                      osc.start(); osc.stop(ctx.currentTime + 0.3);
+                    } catch {}
+                  }
+                  return next;
+                });
+              }}
+              style={{
+                padding: '12px 18px',
+                fontFamily: '"Rubik Mono One", monospace',
+                fontSize: 13,
+                color: muted ? 'rgba(255,255,255,0.5)' : '#00d4ff',
+                background: muted ? 'rgba(255,255,255,0.04)' : 'rgba(0,212,255,0.12)',
+                border: `1px solid ${muted ? 'rgba(255,255,255,0.1)' : 'rgba(0,212,255,0.35)'}`,
+                borderRadius: 100,
+                cursor: 'pointer',
+              }}
+            >{muted ? '🔇' : '🎵'}</button>
+          </div>
+
+          {/* Inventory strip */}
+          <div style={{
+            marginTop: 10,
+            display: 'flex',
+            gap: 12,
+            fontSize: 12,
+            color: 'rgba(255,255,255,0.7)',
+            fontFamily: '"Rubik Mono One", monospace',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span>💥</span><span>{powerPlacerCharges}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span>🐍</span><span>{snakeCharges}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span>⚡</span><span>{overdriveCharges}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ------------------- SHOP -------------------
+  if (screen === 'shop') {
+    return (
+      <div style={shellStyle}>
+        {fontsAndKeyframes}
+        <div style={{ padding: '20px 20px 40px', minHeight: '100vh' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+            <button
+              onClick={() => setScreen('menu')}
+              style={{
+                padding: '8px 14px',
+                fontFamily: '"Rubik Mono One", monospace',
+                fontSize: 12,
+                color: '#fff',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 100,
+                cursor: 'pointer',
+              }}
+            >← BACK</button>
+            <CoinBadge large />
+          </div>
+
+          <div style={{
+            fontFamily: '"Rubik Mono One", monospace',
+            fontSize: 36,
+            letterSpacing: '-0.02em',
+            background: 'linear-gradient(135deg, #00d4ff, #a855f7)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            marginBottom: 4,
+          }}>SHOP</div>
+          <div style={{
+            fontSize: 11,
+            letterSpacing: '0.3em',
+            color: 'rgba(255,255,255,0.4)',
+            marginBottom: 24,
+          }}>SPEND COINS · STACK CHARGES</div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {SHOP.map((item) => {
+              const affordable = coins >= item.price;
+              const owned = item.id === 'pp' ? powerPlacerCharges
+                : item.id === 'snake' ? snakeCharges
+                : overdriveCharges;
+              return (
+                <div key={item.id} style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
+                  padding: '16px 18px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 16,
+                }}>
+                  <div style={{
+                    width: 54,
+                    height: 54,
+                    display: 'grid',
+                    placeItems: 'center',
+                    fontSize: 28,
+                    background: item.id === 'pp'
+                      ? 'linear-gradient(135deg, #ff7b2e, #ff2e6e)'
+                      : item.id === 'snake'
+                      ? 'linear-gradient(135deg, #22d65f, #00ffc2)'
+                      : 'linear-gradient(135deg, #a855f7, #00d4ff)',
+                    borderRadius: 14,
+                    boxShadow: item.id === 'pp'
+                      ? '0 0 20px rgba(255,123,46,0.4)'
+                      : item.id === 'snake'
+                      ? '0 0 20px rgba(34,214,95,0.45)'
+                      : '0 0 20px rgba(168,85,247,0.4)',
+                  }}>{item.glyph}</div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{
+                      fontFamily: '"Rubik Mono One", monospace',
+                      fontSize: 14,
+                      letterSpacing: '0.05em',
+                    }}>{item.label}</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                      {item.desc}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', marginTop: 4, fontFamily: '"Rubik Mono One", monospace' }}>
+                      OWNED: {owned}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => buyItem(item)}
+                    disabled={!affordable}
+                    style={{
+                      padding: '10px 14px',
+                      fontFamily: '"Rubik Mono One", monospace',
+                      fontSize: 12,
+                      color: affordable ? '#0a0818' : 'rgba(255,255,255,0.3)',
+                      background: affordable
+                        ? 'linear-gradient(135deg, #ffd60a, #ff7b2e)'
+                        : 'rgba(255,255,255,0.06)',
+                      border: 'none',
+                      borderRadius: 100,
+                      cursor: affordable ? 'pointer' : 'default',
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      minWidth: 78,
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <span>◉</span><span>{item.price}</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{
+            marginTop: 24,
+            padding: 14,
+            background: 'rgba(255,255,255,0.02)',
+            border: '1px dashed rgba(255,255,255,0.1)',
+            borderRadius: 12,
+            fontSize: 11,
+            color: 'rgba(255,255,255,0.5)',
+            lineHeight: 1.5,
+          }}>
+            Earn coins from clears and big cascades. Return daily for a free bonus. Charges persist across games.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ------------------- STATS -------------------
+  if (screen === 'stats') {
+    return (
+      <div style={shellStyle}>
+        {fontsAndKeyframes}
+        <div style={{ padding: '20px 20px 40px', minHeight: '100vh' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+            <button
+              onClick={() => setScreen('menu')}
+              style={{
+                padding: '8px 14px',
+                fontFamily: '"Rubik Mono One", monospace',
+                fontSize: 12,
+                color: '#fff',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 100,
+                cursor: 'pointer',
+              }}
+            >← BACK</button>
+            <CoinBadge large />
+          </div>
+
+          <div style={{
+            fontFamily: '"Rubik Mono One", monospace',
+            fontSize: 36,
+            letterSpacing: '-0.02em',
+            background: 'linear-gradient(135deg, #ffd60a, #ff7b2e)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+            marginBottom: 24,
+          }}>STATS</div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+            {[
+              { label: 'LEVEL', value: playerLevel, color: '#a855f7' },
+              { label: 'TOTAL XP', value: xp.toLocaleString(), color: '#00d4ff' },
+              { label: 'HIGH SCORE', value: persistedBest.toLocaleString(), color: '#fff' },
+              { label: 'PLAY STREAK', value: `${playStreak} 🔥`, color: '#ff7b2e' },
+              { label: 'GAMES PLAYED', value: gamesPlayed, color: '#7aeaff' },
+              { label: 'LINES CLEARED', value: lifetimeClears, color: '#cb91fb' },
+              { label: 'COINS EARNED', value: lifetimeCoinsEarned, color: '#ffd60a' },
+            ].map((s) => (
+              <div key={s.label} style={{
+                padding: 16,
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 14,
+              }}>
+                <div style={{ fontSize: 9, letterSpacing: '0.25em', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+                  {s.label}
+                </div>
+                <div style={{
+                  fontFamily: '"Rubik Mono One", monospace',
+                  fontSize: 22,
+                  color: s.color,
+                  marginTop: 4,
+                }}>
+                  {s.value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{
+            marginTop: 20,
+            padding: 16,
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 14,
+          }}>
+            <div style={{ fontSize: 10, letterSpacing: '0.25em', color: 'rgba(255,255,255,0.45)', fontWeight: 600, marginBottom: 10 }}>
+              INVENTORY
+            </div>
+            <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 22 }}>💥</span>
+                <div>
+                  <div style={{ fontFamily: '"Rubik Mono One", monospace', fontSize: 20 }}>{powerPlacerCharges}</div>
+                  <div style={{ fontSize: 9, letterSpacing: '0.2em', color: 'rgba(255,255,255,0.4)' }}>POWER PLACERS</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 22 }}>🐍</span>
+                <div>
+                  <div style={{ fontFamily: '"Rubik Mono One", monospace', fontSize: 20 }}>{snakeCharges}</div>
+                  <div style={{ fontSize: 9, letterSpacing: '0.2em', color: 'rgba(255,255,255,0.4)' }}>SNAKES</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 22 }}>⚡</span>
+                <div>
+                  <div style={{ fontFamily: '"Rubik Mono One", monospace', fontSize: 20 }}>{overdriveCharges}</div>
+                  <div style={{ fontSize: 9, letterSpacing: '0.2em', color: 'rgba(255,255,255,0.4)' }}>OVERDRIVES</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ------------------- GAME (default) -------------------
 
   return (
     <div style={{
@@ -1476,6 +2803,23 @@ export default function App() {
             </div>
           </div>
           <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setScreen('menu')}
+                style={{
+                  padding: '4px 10px',
+                  fontFamily: '"Rubik Mono One", monospace',
+                  fontSize: 10,
+                  color: 'rgba(255,255,255,0.5)',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 100,
+                  cursor: 'pointer',
+                  letterSpacing: '0.1em',
+                }}
+              >← MENU</button>
+              <CoinBadge />
+            </div>
             <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
               <div>
                 <div style={{ fontSize: 9, letterSpacing: '0.25em', color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>BEST</div>
@@ -1542,16 +2886,56 @@ export default function App() {
 
         {/* Board */}
         <div style={{ position: 'relative', width: '100%', maxWidth: 400 }}>
+          {/* Snake mode HUD — shows above the board while snake is active */}
+          {snakeActive && (
+            <div style={{
+              position: 'absolute',
+              top: -40,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '6px 16px',
+              background: 'linear-gradient(135deg, rgba(34,214,95,0.3), rgba(0,255,194,0.2))',
+              border: '1px solid rgba(34,214,95,0.6)',
+              borderRadius: 100,
+              fontFamily: '"Rubik Mono One", monospace',
+              fontSize: 12,
+              letterSpacing: '0.15em',
+              color: '#aaffcc',
+              whiteSpace: 'nowrap',
+              zIndex: 30,
+              animation: 'snakeHudGlow 900ms ease-in-out infinite',
+              textShadow: '0 0 10px rgba(0,255,194,0.7)',
+            }}>
+              <span style={{ fontSize: 16 }}>🐍</span>
+              <span>ATE {snakeEaten}</span>
+              <span style={{
+                padding: '1px 8px',
+                background: 'rgba(0,0,0,0.4)',
+                borderRadius: 100,
+                fontSize: 10,
+                color: '#aaffcc',
+                letterSpacing: '0.12em',
+              }}>SWIPE</span>
+            </div>
+          )}
           <div
             ref={boardRef}
+            onPointerDown={snakeSwipe.onPointerDown}
+            onPointerMove={snakeSwipe.onPointerMove}
+            onPointerUp={snakeSwipe.onPointerUp}
+            onPointerCancel={snakeSwipe.onPointerCancel}
             style={{
               width: '100%',
               aspectRatio: '1 / 1',
               display: 'grid',
               gridTemplateColumns: `repeat(${GRID}, 1fr)`,
               gridTemplateRows: `repeat(${GRID}, 1fr)`,
-              gap: 3,
-              padding: 8,
+              gap: 2,
+              padding: 6,
+              touchAction: snakeActive ? 'none' : 'auto',
               background: overdriveActive
                 ? 'linear-gradient(135deg, rgba(0,255,194,0.15), rgba(0,212,255,0.1))'
                 : danger
@@ -1581,6 +2965,8 @@ export default function App() {
                 <div
                   key={i}
                   style={{
+                    gridRow: r + 1,
+                    gridColumn: c + 1,
                     position: 'relative',
                     borderRadius: 6,
                     background: cell ? 'transparent' : 'rgba(255,255,255,0.025)',
@@ -1589,7 +2975,7 @@ export default function App() {
                 >
                   {cell && (
                     <div style={{ position: 'absolute', inset: 0 }}>
-                      <Block color={cell.color} size={boardCell - 3} clearing={isClearing} fresh={isFresh} powerup={cell.powerup} />
+                      <Block color={cell.color} size={boardCell - 2} clearing={isClearing} fresh={isFresh} powerup={cell.powerup} fill />
                     </div>
                   )}
                   {/* Flood preview: EXISTING block about to be destroyed by Power Placer */}
@@ -1624,10 +3010,52 @@ export default function App() {
                         color={powerPlacerPending
                           ? { main: '#ff7b2e', light: '#ffd60a', dark: '#a30d43' }
                           : previewColor}
-                        size={boardCell - 3}
+                        size={boardCell - 2}
                         ghost
+                        fill
                       />
                     </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* SNAKE body segments — positioned in the same CSS grid */}
+            {snakeActive && snakeBody.map((seg, i) => {
+              const isHead = i === 0;
+              const len = snakeBody.length;
+              const t = 1 - i / Math.max(len + 1, 5);  // head=1, tail=~0.2
+              const arrow = snakeDir === 'up' ? '▲' : snakeDir === 'down' ? '▼' : snakeDir === 'left' ? '◀' : '▶';
+              return (
+                <div
+                  key={`snake-${i}`}
+                  style={{
+                    gridRow: seg.r + 1,
+                    gridColumn: seg.c + 1,
+                    position: 'relative',
+                    borderRadius: isHead ? 7 : 5,
+                    background: isHead
+                      ? 'linear-gradient(135deg, #aaffcc 0%, #22d65f 50%, #00ffc2 100%)'
+                      : `linear-gradient(135deg, rgba(34,214,95,${0.35 + t*0.55}) 0%, rgba(0,255,194,${0.25 + t*0.5}) 100%)`,
+                    boxShadow: isHead
+                      ? '0 0 14px rgba(0,255,194,0.95), 0 0 28px rgba(34,214,95,0.7), inset 0 0 0 2px rgba(255,255,255,0.4)'
+                      : `inset 0 0 0 1px rgba(255,255,255,${t * 0.3}), 0 0 ${6 + t*8}px rgba(0,255,194,${t*0.5})`,
+                    zIndex: 20,
+                    display: 'grid',
+                    placeItems: 'center',
+                    transition: 'background 150ms linear',
+                    animation: isHead ? 'snakeHeadPulse 380ms ease-in-out infinite' : 'none',
+                  }}
+                >
+                  {isHead && (
+                    <div style={{
+                      fontFamily: '"Rubik Mono One", monospace',
+                      fontSize: Math.max(10, (boardCell || 32) * 0.45),
+                      color: '#0a3d1f',
+                      fontWeight: 900,
+                      textShadow: '0 0 8px rgba(255,255,255,0.8)',
+                      lineHeight: 1,
+                    }}>{arrow}</div>
                   )}
                 </div>
               );
@@ -1719,7 +3147,7 @@ export default function App() {
                 key={`${trayKey}-${i}-${piece?.id || 'empty'}`}
                 piece={piece}
                 faded={isDragging}
-                slotSize={110}
+                slotSize={130}
                 onPointerDown={(e) => startDrag(e, i)}
               />
             );
@@ -1878,56 +3306,137 @@ export default function App() {
             );
           })()}
 
-          {/* POWER PLACER button */}
+          {/* SNAKE button */}
           {(() => {
-            const hasPP = powerPlacerCharges > 0;
+            const hasSnake = snakeCharges > 0;
             return (
               <button
-                onClick={activatePowerPlacer}
-                disabled={!hasPP || powerPlacerPending || gameOver}
+                onClick={activateSnake}
+                disabled={!hasSnake || snakeActive || gameOver || overdriveActive || powerPlacerPending}
                 style={{
                   padding: '10px 16px',
                   fontFamily: '"Rubik Mono One", monospace',
                   fontSize: 12,
                   letterSpacing: '0.08em',
-                  color: powerPlacerPending
-                    ? '#0a0818'
-                    : hasPP
-                    ? '#fff'
-                    : 'rgba(255,255,255,0.25)',
-                  background: powerPlacerPending
-                    ? 'linear-gradient(135deg, #ffd60a, #ff7b2e)'
-                    : hasPP
-                    ? 'linear-gradient(135deg, #ff7b2e, #ff2e6e)'
+                  color: snakeActive ? '#0a3d1f' : hasSnake ? '#fff' : 'rgba(255,255,255,0.25)',
+                  background: snakeActive
+                    ? 'linear-gradient(135deg, #aaffcc, #22d65f)'
+                    : hasSnake
+                    ? 'linear-gradient(135deg, #22d65f, #00ffc2)'
                     : 'rgba(255,255,255,0.04)',
-                  border: `1.5px solid ${powerPlacerPending ? '#ffd60a' : hasPP ? 'rgba(255,123,46,0.6)' : 'rgba(255,255,255,0.08)'}`,
+                  border: `1.5px solid ${snakeActive ? '#aaffcc' : hasSnake ? 'rgba(34,214,95,0.6)' : 'rgba(255,255,255,0.08)'}`,
                   borderRadius: 100,
-                  cursor: hasPP && !powerPlacerPending ? 'pointer' : 'default',
+                  cursor: hasSnake && !snakeActive ? 'pointer' : 'default',
                   transition: 'all 200ms',
-                  boxShadow: powerPlacerPending
-                    ? '0 0 24px rgba(255,214,10,0.7), 0 0 10px rgba(255,123,46,0.5)'
-                    : hasPP
-                    ? '0 0 10px rgba(255,123,46,0.3)'
+                  boxShadow: snakeActive
+                    ? '0 0 22px rgba(34,214,95,0.8), 0 0 38px rgba(0,255,194,0.5)'
+                    : hasSnake
+                    ? '0 0 10px rgba(34,214,95,0.35)'
                     : 'none',
-                  animation: powerPlacerPending ? 'multiplierPulse 450ms ease-in-out infinite' : 'none',
+                  animation: snakeActive ? 'snakeHudGlow 600ms ease-in-out infinite' : 'none',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 6,
                 }}
               >
-                <span style={{ fontSize: 13 }}>💥</span>
-                <span>{powerPlacerPending ? 'ARMED' : 'POWER'}</span>
-                {!powerPlacerPending && (
+                <span style={{ fontSize: 13 }}>🐍</span>
+                <span>{snakeActive ? 'LIVE' : 'SNAKE'}</span>
+                {!snakeActive && (
                   <span style={{
                     padding: '2px 8px',
-                    background: hasPP ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.08)',
+                    background: hasSnake ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.08)',
                     borderRadius: 100,
                     fontSize: 11,
                   }}>
-                    {powerPlacerCharges}
+                    {snakeCharges}
                   </span>
                 )}
               </button>
+            );
+          })()}
+
+          {/* POWER PLACER button */}
+          {(() => {
+            const hasPP = powerPlacerCharges > 0;
+            const ppEmergency = danger && hasPP && !powerPlacerPending && !overdriveActive;
+            return (
+              <div style={{ position: 'relative' }}>
+                {ppEmergency && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: 'calc(100% + 6px)',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    padding: '4px 10px',
+                    background: 'rgba(255,123,46,0.2)',
+                    border: '1px solid rgba(255,214,10,0.8)',
+                    borderRadius: 100,
+                    fontFamily: '"Rubik Mono One", monospace',
+                    fontSize: 10,
+                    color: '#ffd60a',
+                    letterSpacing: '0.15em',
+                    whiteSpace: 'nowrap',
+                    animation: 'emergencyHint 600ms ease-in-out infinite',
+                    boxShadow: '0 0 14px rgba(255,214,10,0.5)',
+                    pointerEvents: 'none',
+                    zIndex: 5,
+                  }}>
+                    BLAST IT! ↓
+                  </div>
+                )}
+                <button
+                  onClick={activatePowerPlacer}
+                  disabled={!hasPP || powerPlacerPending || gameOver}
+                  style={{
+                    padding: '10px 16px',
+                    fontFamily: '"Rubik Mono One", monospace',
+                    fontSize: 12,
+                    letterSpacing: '0.08em',
+                    color: powerPlacerPending
+                      ? '#0a0818'
+                      : hasPP
+                      ? '#fff'
+                      : 'rgba(255,255,255,0.25)',
+                    background: powerPlacerPending
+                      ? 'linear-gradient(135deg, #ffd60a, #ff7b2e)'
+                      : hasPP
+                      ? 'linear-gradient(135deg, #ff7b2e, #ff2e6e)'
+                      : 'rgba(255,255,255,0.04)',
+                    border: `1.5px solid ${powerPlacerPending ? '#ffd60a' : hasPP ? 'rgba(255,123,46,0.6)' : 'rgba(255,255,255,0.08)'}`,
+                    borderRadius: 100,
+                    cursor: hasPP && !powerPlacerPending ? 'pointer' : 'default',
+                    transition: 'all 200ms',
+                    boxShadow: powerPlacerPending
+                      ? '0 0 24px rgba(255,214,10,0.7), 0 0 10px rgba(255,123,46,0.5)'
+                      : ppEmergency
+                      ? '0 0 24px rgba(255,214,10,0.7), 0 0 40px rgba(255,123,46,0.5)'
+                      : hasPP
+                      ? '0 0 10px rgba(255,123,46,0.3)'
+                      : 'none',
+                    animation: powerPlacerPending
+                      ? 'multiplierPulse 450ms ease-in-out infinite'
+                      : ppEmergency
+                      ? 'emergencyPulse 500ms ease-in-out infinite'
+                      : 'none',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <span style={{ fontSize: 13 }}>💥</span>
+                  <span>{powerPlacerPending ? 'ARMED' : 'POWER'}</span>
+                  {!powerPlacerPending && (
+                    <span style={{
+                      padding: '2px 8px',
+                      background: hasPP ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.08)',
+                      borderRadius: 100,
+                      fontSize: 11,
+                    }}>
+                      {powerPlacerCharges}
+                    </span>
+                  )}
+                </button>
+              </div>
             );
           })()}
 
@@ -1971,13 +3480,13 @@ export default function App() {
               position: 'absolute',
               top: r * boardCell,
               left: c * boardCell,
-              padding: 1.5,
+              padding: 1,
             }}>
               <Block
                 color={powerPlacerPending
                   ? { main: '#ff7b2e', light: '#ffd60a', dark: '#a30d43' }
                   : drag.piece.color}
-                size={boardCell - 3}
+                size={boardCell - 2}
               />
             </div>
           ))}
@@ -2057,25 +3566,209 @@ export default function App() {
               <div style={{ fontSize: 9, letterSpacing: '0.25em', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>CLEARS</div>
               <div style={{ fontFamily: '"Rubik Mono One", monospace', fontSize: 20, color: '#7aeaff' }}>{clearCount}</div>
             </div>
+            <div style={{ width: 1, background: 'rgba(255,255,255,0.08)' }} />
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 9, letterSpacing: '0.25em', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>EARNED</div>
+              <div style={{ fontFamily: '"Rubik Mono One", monospace', fontSize: 20, color: '#ffd60a', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+                <span>◉</span><span>{coinsEarnedThisGame + Math.floor(score / 100)}</span>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={reset}
-            style={{
-              padding: '14px 36px',
-              fontFamily: '"Rubik", sans-serif',
-              fontSize: 12,
-              letterSpacing: '0.3em',
-              fontWeight: 800,
-              color: '#fff',
-              background: 'linear-gradient(135deg, #a855f7, #ff2e6e)',
-              border: 'none',
-              borderRadius: 100,
-              cursor: 'pointer',
-              boxShadow: '0 8px 24px rgba(168,85,247,0.5)',
-            }}
-          >
-            PLAY AGAIN
-          </button>
+
+          {/* CONTINUE — pay coins to resurrect with a free Overdrive */}
+          {canContinue && (
+            <button
+              onClick={continueGame}
+              style={{
+                padding: '14px 28px',
+                fontFamily: '"Rubik Mono One", monospace',
+                fontSize: 14,
+                letterSpacing: '0.15em',
+                color: '#0a0818',
+                background: 'linear-gradient(135deg, #ffd60a, #ff7b2e)',
+                border: 'none',
+                borderRadius: 100,
+                cursor: 'pointer',
+                boxShadow: '0 0 28px rgba(255,214,10,0.6), 0 6px 18px rgba(255,123,46,0.4)',
+                animation: 'menuPulse 1.4s ease-in-out infinite',
+                display: 'flex', alignItems: 'center', gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 16 }}>⚡</span>
+              <span>CONTINUE</span>
+              <span style={{
+                padding: '2px 8px',
+                background: 'rgba(0,0,0,0.25)',
+                borderRadius: 100,
+                fontSize: 11,
+                display: 'flex', alignItems: 'center', gap: 4,
+              }}><span>◉</span><span>{CONTINUE_COST}</span></span>
+            </button>
+          )}
+          {usedContinue && (
+            <div style={{ fontSize: 10, letterSpacing: '0.25em', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
+              CONTINUE USED
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              onClick={reset}
+              style={{
+                padding: '14px 28px',
+                fontFamily: '"Rubik", sans-serif',
+                fontSize: 12,
+                letterSpacing: '0.25em',
+                fontWeight: 800,
+                color: '#fff',
+                background: 'linear-gradient(135deg, #a855f7, #ff2e6e)',
+                border: 'none',
+                borderRadius: 100,
+                cursor: 'pointer',
+                boxShadow: '0 8px 24px rgba(168,85,247,0.5)',
+              }}
+            >
+              PLAY AGAIN
+            </button>
+            <button
+              onClick={() => { reset(); setScreen('menu'); }}
+              style={{
+                padding: '14px 22px',
+                fontFamily: '"Rubik", sans-serif',
+                fontSize: 12,
+                letterSpacing: '0.25em',
+                fontWeight: 700,
+                color: 'rgba(255,255,255,0.7)',
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 100,
+                cursor: 'pointer',
+              }}
+            >
+              MENU
+            </button>
+            <button
+              onClick={() => setScreen('shop')}
+              style={{
+                padding: '14px 22px',
+                fontFamily: '"Rubik", sans-serif',
+                fontSize: 12,
+                letterSpacing: '0.25em',
+                fontWeight: 700,
+                color: '#ffd60a',
+                background: 'rgba(255,214,10,0.08)',
+                border: '1px solid rgba(255,214,10,0.35)',
+                borderRadius: 100,
+                cursor: 'pointer',
+              }}
+            >
+              🛒 SHOP
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Flying coin particles — visual feedback on earn */}
+      {flyingCoins.map(c => (
+        <div key={c.id} style={{
+          position: 'fixed',
+          left: c.x,
+          top: c.y,
+          fontFamily: '"Rubik Mono One", monospace',
+          fontSize: 22,
+          color: '#ffd60a',
+          textShadow: '0 0 16px #ffd60a, 0 0 28px rgba(255,123,46,0.6)',
+          animation: 'coinFly 950ms cubic-bezier(.4,0,.2,1) forwards',
+          pointerEvents: 'none',
+          zIndex: 150,
+          transform: 'translate(-50%, -50%)',
+          willChange: 'transform, opacity',
+        }}>◉</div>
+      ))}
+
+      {/* CELEBRATION banner — MEGA CASCADE / PERFECT / LEVEL UP / MILESTONES */}
+      {celebration && (
+        <div
+          key={celebration.id}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            display: 'grid',
+            placeItems: 'center',
+            pointerEvents: 'none',
+            zIndex: 200,
+          }}
+        >
+          {/* Screen flash backdrop */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: celebration.type === 'perfect'
+              ? 'radial-gradient(ellipse at center, rgba(255,255,255,0.25), rgba(0,212,255,0.15) 40%, transparent 70%)'
+              : celebration.type === 'mega'
+              ? 'radial-gradient(ellipse at center, rgba(255,46,110,0.3), rgba(255,123,46,0.18) 45%, transparent 75%)'
+              : celebration.type === 'level'
+              ? 'radial-gradient(ellipse at center, rgba(168,85,247,0.28), rgba(0,212,255,0.15) 45%, transparent 75%)'
+              : 'radial-gradient(ellipse at center, rgba(255,214,10,0.22), rgba(255,123,46,0.1) 45%, transparent 75%)',
+            animation: 'megaFlash 600ms ease-out',
+          }} />
+
+          <div style={{
+            position: 'relative',
+            padding: '20px 36px',
+            textAlign: 'center',
+            animation: 'celebrationIn 400ms cubic-bezier(.3,1.6,.5,1), celebrationFadeOut 500ms ease 1900ms forwards',
+          }}>
+            <div style={{
+              fontFamily: '"Rubik Mono One", monospace',
+              fontSize: celebration.type === 'mega' || celebration.type === 'perfect' ? 56 : 44,
+              letterSpacing: '-0.02em',
+              lineHeight: 0.95,
+              background: celebration.type === 'perfect'
+                ? 'linear-gradient(135deg, #ffffff 0%, #00d4ff 50%, #a855f7 100%)'
+                : celebration.type === 'mega'
+                ? 'linear-gradient(135deg, #ffd60a 0%, #ff7b2e 50%, #ff2e6e 100%)'
+                : celebration.type === 'level'
+                ? 'linear-gradient(135deg, #00d4ff 0%, #a855f7 50%, #ff2e6e 100%)'
+                : 'linear-gradient(135deg, #ffd60a 0%, #ff7b2e 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              animation: 'celebrationPulse 700ms ease-in-out infinite',
+            }}>
+              {celebration.title}
+            </div>
+            <div style={{
+              fontFamily: '"Rubik Mono One", monospace',
+              fontSize: 13,
+              letterSpacing: '0.35em',
+              color: 'rgba(255,255,255,0.9)',
+              marginTop: 14,
+              textShadow: '0 0 18px rgba(0,212,255,0.6)',
+            }}>
+              {celebration.subtext}
+            </div>
+            {celebration.bonus != null && celebration.bonus > 0 && (
+              <div style={{
+                marginTop: 16,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 18px',
+                background: 'rgba(255,214,10,0.15)',
+                border: '1px solid rgba(255,214,10,0.5)',
+                borderRadius: 100,
+                fontFamily: '"Rubik Mono One", monospace',
+                fontSize: 20,
+                color: '#ffd60a',
+                textShadow: '0 0 18px #ffd60a',
+                boxShadow: '0 0 30px rgba(255,214,10,0.5)',
+              }}>
+                <span>◉</span>
+                <span>+{celebration.bonus}</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
