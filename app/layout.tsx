@@ -5,6 +5,12 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Cascade',
   description: 'Block puzzle game with powerups, modes, and a snake minigame.',
+  applicationName: 'Cascade',
+  appleWebApp: {
+    capable: true,
+    title: 'Cascade',
+    statusBarStyle: 'black-translucent',
+  },
 };
 
 export const viewport: Viewport = {

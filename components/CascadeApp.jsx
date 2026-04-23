@@ -2965,10 +2965,9 @@ export default function App() {
         {/* Board — takes full container width, always square */}
         <div style={{
           position: 'relative',
-          // Scale to use available vertical space on mobile (small screens).
-          // 100vw cap keeps it under screen width; dvh cap stops it stealing
-          // HUD/tray space on short viewports. Max 440 on tablets.
-          width: 'min(100%, 440px, calc(100dvh - 240px))',
+          // Reserve ~300px for HUD + tray + buttons so powerups stay visible
+          // even on short viewports. Cap at 440 so it doesn't get massive on tablets.
+          width: 'min(100%, 440px, calc(100dvh - 300px))',
           alignSelf: 'center',
         }}>
           {/* Snake mode HUD — shows above the board while snake is active */}
