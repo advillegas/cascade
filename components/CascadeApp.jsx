@@ -321,6 +321,28 @@ export default function App() {
   const [clearCount, setClearCount] = useState(0);
   const [clearing, setClearing] = useState({ rows: [], cols: [] });
   const [gameOver, setGameOver] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const pausedRef = useRef(false);
+  const pauseStartRef = useRef(0);
+  useEffect(() => { pausedRef.current = paused; }, [paused]);
+
+  // Toggle pause and shift any absolute-timestamp timers (overdrive) forward
+  // by the paused duration so they resume where they left off.
+  const togglePause = () => {
+    setPaused(p => {
+      const now = Date.now();
+      if (!p) {
+        // Entering pause
+        pauseStartRef.current = now;
+      } else {
+        // Leaving pause — advance overdrive deadline
+        const elapsed = now - pauseStartRef.current;
+        pauseStartRef.current = 0;
+        setOverdriveEndsAt(e => e ? e + elapsed : null);
+      }
+      return !p;
+    });
+  };
   const [drag, setDrag] = useState(null);
   const [preview, setPreview] = useState(null);
   const [toast, setToast] = useState(null);
@@ -956,6 +978,9 @@ export default function App() {
     setClearCount(0);
     setClearing({ rows: [], cols: [] });
     setGameOver(false);
+    setPaused(false);
+    pausedRef.current = false;
+    pauseStartRef.current = 0;
     // Reset timed-mode clock. Other modes ignore this value.
     {
       const start = modeRef.current === 'timed' ? TIMED_START : 0;
@@ -1049,6 +1074,7 @@ export default function App() {
   useEffect(() => {
     if (!overdriveEndsAt) return;
     const id = setInterval(() => {
+      if (pausedRef.current) return;
       const t = Date.now();
       setNowTick(t);
       if (t >= overdriveEndsAt) {
@@ -1366,6 +1392,7 @@ export default function App() {
 
   const snakeTick = () => {
     if (!snakeActiveRef.current) return;
+    if (pausedRef.current) return;
 
     // Resolve direction (queued if not directly opposite)
     const currentDir = snakeDirRef.current;
@@ -1491,7 +1518,7 @@ export default function App() {
     if (mode !== 'timed' || gameOver) return;
     const tickMs = 100;
     const id = setInterval(() => {
-      if (overdriveActive || snakeActiveRef.current) return;
+      if (overdriveActive || snakeActiveRef.current || pausedRef.current) return;
       setTimeRemaining(prev => {
         const next = Math.max(0, prev - tickMs / 1000);
         timeRemainingRef.current = next;
@@ -2090,7 +2117,7 @@ export default function App() {
   }, [drag, preview, board, tray, canPlace, overdriveActive, powerPlacerPending]);
 
   const startDrag = (e, trayIndex) => {
-    if (gameOver || clearing.rows.length || clearing.cols.length || (clearing.extra && clearing.extra.length)) return;
+    if (gameOver || paused || clearing.rows.length || clearing.cols.length || (clearing.extra && clearing.extra.length)) return;
     const piece = tray[trayIndex];
     if (!piece || !boardRef.current) return;
     initAudio();
@@ -3671,9 +3698,31 @@ export default function App() {
           })()}
 
           <button
-            onClick={reset}
+            onClick={togglePause}
+            disabled={gameOver}
             style={{
               order: 11,
+              padding: '7px 12px',
+              fontFamily: '"Rubik", sans-serif',
+              fontSize: 10,
+              letterSpacing: '0.15em',
+              fontWeight: 700,
+              color: paused ? '#ffd60a' : 'rgba(255,255,255,0.6)',
+              background: paused ? 'rgba(255,214,10,0.12)' : 'rgba(255,255,255,0.04)',
+              border: `1px solid ${paused ? 'rgba(255,214,10,0.4)' : 'rgba(255,255,255,0.08)'}`,
+              borderRadius: 100,
+              cursor: gameOver ? 'default' : 'pointer',
+              transition: 'all 200ms',
+              opacity: gameOver ? 0.4 : 1,
+            }}
+          >
+            {paused ? '▶ RESUME' : '⏸ PAUSE'}
+          </button>
+
+          <button
+            onClick={reset}
+            style={{
+              order: 12,
               padding: '7px 16px',
               fontFamily: '"Rubik", sans-serif',
               fontSize: 10,
@@ -3745,6 +3794,41 @@ export default function App() {
           }}
         />
       ))}
+
+      {paused && !gameOver && (
+        <div
+          onClick={togglePause}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(5,4,16,0.78)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 14,
+            zIndex: 90,
+            padding: 20,
+            cursor: 'pointer',
+          }}>
+          <div style={{
+            fontFamily: '"Rubik Mono One", monospace',
+            fontSize: 44,
+            letterSpacing: '0.3em',
+            background: 'linear-gradient(135deg, #ffd60a, #ff7b2e)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            backgroundClip: 'text',
+          }}>PAUSED</div>
+          <div style={{
+            fontSize: 11,
+            letterSpacing: '0.3em',
+            color: 'rgba(255,255,255,0.45)',
+            fontFamily: '"Rubik Mono One", monospace',
+          }}>TAP TO RESUME</div>
+        </div>
+      )}
 
       {gameOver && (
         <div style={{
