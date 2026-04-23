@@ -73,11 +73,19 @@ const themeForLevel = (lvl) => LEVEL_THEMES[(lvl - 1) % LEVEL_THEMES.length];
 const DEFAULT_BG = LEVEL_THEMES[0].bg;
 
 // Game modes. "hasLevels" modes track progress per level; endless and snake are score-based.
+// Timed-mode tuning (all in seconds).
+const TIMED_START = 30;       // starting clock
+const TIMED_MAX = 99;         // cap so players can't bank forever
+const TIMED_PER_PLACE = 1.5;  // every block placement
+const TIMED_PER_CLEAR = 3;    // each line/column cleared
+const TIMED_PER_SNAKE_EAT = 1;
+
 const MODES = {
+  // Kept id=endless for save-state compatibility; presented as CLASSIC in UI.
   endless: {
     id: 'endless',
-    label: 'ENDLESS',
-    tagline: 'Classic. Chase the high score.',
+    label: 'CLASSIC',
+    tagline: 'No timer. Chase the high score.',
     glyph: '∞',
     gradient: 'linear-gradient(135deg, #00d4ff, #a855f7)',
     border: 'rgba(168,85,247,0.5)',
@@ -96,19 +104,16 @@ const MODES = {
       label: `Clear ${25 + Math.floor(lvl * 12)} blocks`,
     }),
   },
+  // Redesigned: continuous countdown. Every placement + clear + snake eat
+  // adds time. Overdrive and snake mode freeze the timer (can't lose).
   timed: {
     id: 'timed',
     label: 'TIMED',
-    tagline: 'Hit the score target before time runs out.',
+    tagline: 'Countdown. Place blocks and clear lines to bank time.',
     glyph: '◷',
     gradient: 'linear-gradient(135deg, #ff7b2e, #ff2e6e)',
     border: 'rgba(255,123,46,0.5)',
-    hasLevels: true,
-    levelConfig: (lvl) => ({
-      target: 400 + lvl * 300,
-      seconds: 90,
-      label: `${400 + lvl * 300} points in 90s`,
-    }),
+    hasLevels: false,
   },
   treasure: {
     id: 'treasure',
@@ -380,10 +385,11 @@ export default function App() {
   const [modeLevel, setModeLevel] = useState(1);
   const [levelBlocks, setLevelBlocks] = useState(0); // blocks cleared this level (goal mode)
   const [timeRemaining, setTimeRemaining] = useState(0); // seconds, timed mode
+  const timeRemainingRef = useRef(0);
   const [levelComplete, setLevelComplete] = useState(false);
   // Persistent: highest level reached per mode
   const [modeProgress, setModeProgress] = useState({ goal: 1, timed: 1, treasure: 1 });
-  const [modeBests, setModeBests] = useState({ endless: 0, snake: 0 }); // high scores for score modes
+  const [modeBests, setModeBests] = useState({ endless: 0, timed: 0, snake: 0 }); // high scores for score modes
   const modeRef = useRef('endless');
   useEffect(() => { modeRef.current = mode; }, [mode]);
 
@@ -411,7 +417,7 @@ export default function App() {
         const mp = await window.storage.get('modeProgress').catch(() => null);
         if (mp?.value) { try { setModeProgress({ ...{ goal:1, timed:1, treasure:1 }, ...JSON.parse(mp.value) }); } catch {} }
         const mb = await window.storage.get('modeBests').catch(() => null);
-        if (mb?.value) { try { setModeBests({ ...{ endless:0, snake:0 }, ...JSON.parse(mb.value) }); } catch {} }
+        if (mb?.value) { try { setModeBests({ ...{ endless:0, timed:0, snake:0 }, ...JSON.parse(mb.value) }); } catch {} }
       } catch {}
       setMetaLoaded(true);
     })();
@@ -950,6 +956,12 @@ export default function App() {
     setClearCount(0);
     setClearing({ rows: [], cols: [] });
     setGameOver(false);
+    // Reset timed-mode clock. Other modes ignore this value.
+    {
+      const start = modeRef.current === 'timed' ? TIMED_START : 0;
+      setTimeRemaining(start);
+      timeRemainingRef.current = start;
+    }
     setToast(null);
     setPopups([]);
     setParticles([]);
@@ -1415,6 +1427,8 @@ export default function App() {
       setSnakeEaten(e => e + 1);
       snakeScoreRef.current += 10;
       setSnakeScore(s => s + 10);
+      // Timed mode: eating a block banks a second onto the clock.
+      addTime(TIMED_PER_SNAKE_EAT);
       // Coin drop at eaten cell
       const rect = boardRef.current?.getBoundingClientRect();
       if (rect && boardCell) {
@@ -1459,6 +1473,46 @@ export default function App() {
     const id = setInterval(snakeTick, SNAKE_TICK_MS);
     return () => clearInterval(id);
   }, [snakeActive]);
+
+  // Add time to the timed-mode clock, capped at TIMED_MAX. No-op in other modes.
+  const addTime = (seconds) => {
+    if (modeRef.current !== 'timed' || !seconds) return;
+    setTimeRemaining(prev => {
+      const next = Math.min(TIMED_MAX, prev + seconds);
+      timeRemainingRef.current = next;
+      return next;
+    });
+  };
+
+  // Timed-mode countdown. Ticks every 100 ms for smooth display. The timer
+  // freezes while overdrive or snake is active so the player can't lose
+  // while a powerup is running, per design.
+  useEffect(() => {
+    if (mode !== 'timed' || gameOver) return;
+    const tickMs = 100;
+    const id = setInterval(() => {
+      if (overdriveActive || snakeActiveRef.current) return;
+      setTimeRemaining(prev => {
+        const next = Math.max(0, prev - tickMs / 1000);
+        timeRemainingRef.current = next;
+        if (next === 0 && !gameOver) {
+          // Schedule the game-over flip outside this setter to avoid nested
+          // state updates inside setTimeRemaining.
+          setTimeout(() => {
+            if (modeRef.current === 'timed' && timeRemainingRef.current === 0) {
+              setGameOver(true);
+              if (!mutedRef.current && audioRef.current) {
+                try { playSweep(440, 110, 0.6, 'sawtooth', 0.18); } catch {}
+              }
+              vibe([80, 40, 160]);
+            }
+          }, 0);
+        }
+        return next;
+      });
+    }, tickMs);
+    return () => clearInterval(id);
+  }, [mode, gameOver, overdriveActive]);
 
   // Snake swipe handlers (attached to board container while active)
   const snakeSwipe = {
@@ -1635,6 +1689,10 @@ export default function App() {
     const newStreak = lines > 0 ? streak + 1 : 0;
     const streakMult = getMultiplier(newStreak);
     setStreak(newStreak);
+
+    // Timed mode: every placement banks a little time; each cleared line
+    // banks a bigger chunk. Capped at TIMED_MAX inside addTime().
+    addTime(TIMED_PER_PLACE + lines * TIMED_PER_CLEAR);
 
     // SCORING
     //   Placement: +1 per block placed
@@ -2336,9 +2394,53 @@ export default function App() {
             </button>
           )}
 
+          {/* Mode selector — pick Classic or Timed before hitting PLAY */}
+          <div style={{
+            display: 'flex',
+            gap: 6,
+            padding: 4,
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 100,
+          }}>
+            {['endless', 'timed'].map((m) => {
+              const active = mode === m;
+              const label = m === 'endless' ? 'CLASSIC' : 'TIMED';
+              const accent = m === 'endless'
+                ? 'linear-gradient(135deg, #00d4ff, #a855f7)'
+                : 'linear-gradient(135deg, #ff7b2e, #ff2e6e)';
+              return (
+                <button
+                  key={m}
+                  onClick={() => { initAudio(); setMode(m); }}
+                  style={{
+                    padding: '8px 18px',
+                    fontFamily: '"Rubik Mono One", monospace',
+                    fontSize: 11,
+                    letterSpacing: '0.2em',
+                    color: active ? '#fff' : 'rgba(255,255,255,0.55)',
+                    background: active ? accent : 'transparent',
+                    border: 'none',
+                    borderRadius: 100,
+                    cursor: 'pointer',
+                    boxShadow: active ? '0 0 18px rgba(168,85,247,0.35)' : 'none',
+                    transition: 'all 180ms',
+                  }}
+                >{label}</button>
+              );
+            })}
+          </div>
+
           {/* PLAY — big primary button */}
           <button
-            onClick={() => { initAudio(); reset(); checkPlayStreak(); setScreen('game'); }}
+            onClick={() => {
+              initAudio();
+              // Ensure modeRef is synced before reset reads it
+              modeRef.current = mode;
+              reset();
+              checkPlayStreak();
+              setScreen('game');
+            }}
             style={{
               padding: '20px 60px',
               fontFamily: '"Rubik Mono One", monospace',
@@ -2894,6 +2996,27 @@ export default function App() {
               <CoinBadge />
             </div>
             <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+              {mode === 'timed' && (
+                <div>
+                  <div style={{ fontSize: 9, letterSpacing: '0.25em', color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>TIME</div>
+                  <div style={{
+                    fontFamily: '"Rubik Mono One", monospace',
+                    fontSize: 22,
+                    lineHeight: 1,
+                    color: timeRemaining <= 5 ? '#ff2e6e' : timeRemaining <= 10 ? '#ffd60a' : '#00ffc2',
+                    textShadow: timeRemaining <= 5
+                      ? '0 0 16px rgba(255,46,110,0.7)'
+                      : timeRemaining <= 10
+                      ? '0 0 14px rgba(255,214,10,0.55)'
+                      : '0 0 12px rgba(0,255,194,0.45)',
+                    animation: timeRemaining <= 5 && !overdriveActive && !snakeActive
+                      ? 'dangerBadge 400ms ease-in-out infinite'
+                      : 'none',
+                  }}>
+                    {Math.ceil(timeRemaining).toString().padStart(2, '0')}
+                  </div>
+                </div>
+              )}
               <div>
                 <div style={{ fontSize: 9, letterSpacing: '0.25em', color: 'rgba(255,255,255,0.35)', fontWeight: 600 }}>BEST</div>
                 <div style={{ fontFamily: '"Rubik Mono One", monospace', fontSize: 16, color: 'rgba(255,255,255,0.6)' }}>
