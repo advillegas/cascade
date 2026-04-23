@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 
 const GRID = 8;
@@ -1953,11 +1955,29 @@ export default function App() {
           newCells = morphedPlacement(drag.piece.cells.length, board, cursorR, cursorC);
         }
       } else {
-        const col = Math.round((pLeft - rect.left) / cs);
-        const row = Math.round((pTop - rect.top) / cs);
-        if (canPlace(drag.piece, row, col, board)) {
-          newCells = drag.piece.cells.map(([dr, dc]) => [row + dr, col + dc]);
-          meta = { row, col };
+        // Target grid cell under the piece's top-left
+        const targetCol = Math.round((pLeft - rect.left) / cs);
+        const targetRow = Math.round((pTop - rect.top) / cs);
+        // Continuous target (fractional) for tie-breaking
+        const fCol = (pLeft - rect.left) / cs;
+        const fRow = (pTop - rect.top) / cs;
+        // Snap search: try target, then expand outward up to radius 2.
+        // Pick the valid placement closest to the continuous target so the
+        // piece locks onto the nearest fit when cursor hovers a deadspot.
+        let bestRow = -1, bestCol = -1, bestDist = Infinity;
+        const SNAP_RADIUS = 2;
+        for (let dr = -SNAP_RADIUS; dr <= SNAP_RADIUS; dr++) {
+          for (let dc = -SNAP_RADIUS; dc <= SNAP_RADIUS; dc++) {
+            const r = targetRow + dr, c = targetCol + dc;
+            if (!canPlace(drag.piece, r, c, board)) continue;
+            const ddr = r - fRow, ddc = c - fCol;
+            const d = ddr * ddr + ddc * ddc;
+            if (d < bestDist) { bestDist = d; bestRow = r; bestCol = c; }
+          }
+        }
+        if (bestRow >= 0) {
+          newCells = drag.piece.cells.map(([dr, dc]) => [bestRow + dr, bestCol + dc]);
+          meta = { row: bestRow, col: bestCol };
         }
       }
 

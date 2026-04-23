@@ -1,10 +1,9 @@
 node_modules
+.next
+out
 dist
-dist-ssr
 *.local
-.vite
-.vscode/*
-!.vscode/extensions.json
+.vscode
 .idea
 .DS_Store
 *.log
@@ -12,3 +11,4 @@ dist-ssr
 .env.local
 .env.*.local
 .vercel
+next-env.d.ts
