@@ -2678,7 +2678,6 @@ export default function App() {
   return (
     <div style={{
       height: '100dvh',
-      minHeight: '100vh',
       maxHeight: '100dvh',
       width: '100%',
       background: 'radial-gradient(ellipse at top, #1a1440 0%, #0a0818 55%, #050410 100%)',
@@ -2687,10 +2686,10 @@ export default function App() {
       touchAction: 'manipulation',
       userSelect: 'none',
       WebkitUserSelect: 'none',
-      overflow: 'hidden',
+      overflowY: 'auto',
+      overflowX: 'hidden',
+      WebkitOverflowScrolling: 'touch',
       position: 'relative',
-      display: 'flex',
-      flexDirection: 'column',
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Rubik+Mono+One&family=Rubik:wght@400;500;700;900&display=swap');
@@ -2994,11 +2993,7 @@ export default function App() {
             onPointerUp={snakeSwipe.onPointerUp}
             onPointerCancel={snakeSwipe.onPointerCancel}
             style={{
-              // Cap width so HUD + board + tray fit within one viewport height
-              // without the page needing to scroll. ~260px reserves space for
-              // the top HUD and bottom tray across all supported screens.
-              width: 'min(100%, calc(100dvh - 260px))',
-              alignSelf: 'center',
+              width: '100%',
               aspectRatio: '1 / 1',
               display: 'grid',
               gridTemplateColumns: `repeat(${GRID}, 1fr)`,
