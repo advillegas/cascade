@@ -149,6 +149,20 @@ const makePiece = () => ({
   color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
 });
 const newTray = () => [makePiece(), makePiece(), makePiece()];
+
+// Rotate a piece's cells 90° clockwise. A cell at (r,c) in an h-row piece
+// maps to (c, h-1-r) after rotation. Then renormalize so min row/col is 0.
+const rotateCells = (cells) => {
+  let maxR = 0;
+  for (const [r] of cells) if (r > maxR) maxR = r;
+  const rotated = cells.map(([r, c]) => [c, maxR - r]);
+  let minR = Infinity, minC = Infinity;
+  for (const [r, c] of rotated) {
+    if (r < minR) minR = r;
+    if (c < minC) minC = c;
+  }
+  return rotated.map(([r, c]) => [r - minR, c - minC]);
+};
 const dims = (cells) => {
   let mr = 0, mc = 0;
   for (const [r, c] of cells) { if (r > mr) mr = r; if (c > mc) mc = c; }
@@ -2035,7 +2049,13 @@ export default function App() {
       const pH = d.rows * cs;
       const pLeft = e.clientX - pW / 2;
       const pTop = e.clientY - lift - pH / 2;
-      setDrag(prev => ({ ...prev, x: e.clientX, y: e.clientY, pLeft, pTop, pW, pH }));
+      // Flip moved=true once the pointer wanders past the tap threshold
+      // so pointerup can distinguish a tap (rotate) from a drag (place).
+      const TAP_SLOP = 8;
+      const movedNow =
+        drag.moved ||
+        Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) > TAP_SLOP;
+      setDrag(prev => ({ ...prev, x: e.clientX, y: e.clientY, pLeft, pTop, pW, pH, moved: movedNow }));
 
       const overBoard =
         e.clientX >= rect.left - 40 && e.clientX <= rect.right + 40 &&
@@ -2102,7 +2122,19 @@ export default function App() {
       }
     };
     const up = () => {
-      if (preview && preview.cells) place(drag.trayIndex, preview.cells);
+      if (preview && preview.cells) {
+        place(drag.trayIndex, preview.cells);
+      } else if (!drag.moved) {
+        // Tap with no drag movement — rotate the piece in the tray 90° CW.
+        // Cheap haptic + blip so the rotation feels intentional.
+        const idx = drag.trayIndex;
+        setTray(curTray => curTray.map((p, i) =>
+          i === idx && p ? { ...p, cells: rotateCells(p.cells) } : p));
+        vibe(6);
+        if (!mutedRef.current && audioRef.current) {
+          try { playTone(520, 0.04, 'triangle', 0.08); } catch {}
+        }
+      }
       setDrag(null);
       setPreview(null);
     };
@@ -2129,7 +2161,19 @@ export default function App() {
     const pH = d.rows * cs;
     const pLeft = e.clientX - pW / 2;
     const pTop = e.clientY - lift - pH / 2;
-    setDrag({ piece, trayIndex, x: e.clientX, y: e.clientY, pLeft, pTop, pW, pH });
+    setDrag({
+      piece,
+      trayIndex,
+      x: e.clientX,
+      y: e.clientY,
+      pLeft, pTop, pW, pH,
+      // Track where the pointer went down so we can tell a tap (rotate)
+      // from a drag (place). If total movement stays below the threshold
+      // until pointerup, we treat it as a tap.
+      startX: e.clientX,
+      startY: e.clientY,
+      moved: false,
+    });
     e.preventDefault();
   };
 
