@@ -3288,7 +3288,7 @@ export default function App() {
             const hasCharges = overdriveCharges > 0;
             const emergency = danger && hasCharges && !overdriveActive;
             return (
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative', flex: '1 1 0', minWidth: 0, maxWidth: 170 }}>
                 {emergency && (
                   <div style={{
                     position: 'absolute',
@@ -3341,7 +3341,7 @@ export default function App() {
                       ? '0 0 10px rgba(168,85,247,0.25)'
                       : 'none',
                     animation: emergency ? 'emergencyPulse 600ms ease-in-out infinite' : 'none',
-                    minWidth: 120,
+                    width: '100%',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -3401,7 +3401,10 @@ export default function App() {
                 onClick={activateSnake}
                 disabled={!hasSnake || snakeActive || gameOver || overdriveActive || powerPlacerPending}
                 style={{
-                  padding: '7px 12px',
+                  flex: '1 1 0',
+                  minWidth: 0,
+                  maxWidth: 140,
+                  padding: '7px 10px',
                   fontFamily: '"Rubik Mono One", monospace',
                   fontSize: 10,
                   letterSpacing: '0.06em',
@@ -3451,7 +3454,7 @@ export default function App() {
             const hasPP = powerPlacerCharges > 0;
             const ppEmergency = danger && hasPP && !powerPlacerPending && !overdriveActive;
             return (
-              <div style={{ position: 'relative' }}>
+              <div style={{ position: 'relative', flex: '1 1 0', minWidth: 0, maxWidth: 140 }}>
                 {ppEmergency && (
                   <div style={{
                     position: 'absolute',
@@ -3479,7 +3482,8 @@ export default function App() {
                   onClick={activatePowerPlacer}
                   disabled={!hasPP || powerPlacerPending || gameOver}
                   style={{
-                    padding: '7px 12px',
+                    width: '100%',
+                    padding: '7px 10px',
                     fontFamily: '"Rubik Mono One", monospace',
                     fontSize: 10,
                     letterSpacing: '0.06em',
