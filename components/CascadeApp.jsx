@@ -3237,7 +3237,9 @@ export default function App() {
           })}
         </div>
 
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
+          {/* Row break forces AUDIO + NEW GAME onto a second line below the powerups */}
+          <div style={{ flexBasis: '100%', height: 0, order: 5 }} />
           <button
             onClick={() => {
               initAudio();
@@ -3264,6 +3266,7 @@ export default function App() {
               });
             }}
             style={{
+              order: 10,
               padding: '7px 12px',
               fontFamily: '"Rubik", sans-serif',
               fontSize: 10,
@@ -3392,6 +3395,7 @@ export default function App() {
           {/* SNAKE button */}
           {(() => {
             const hasSnake = snakeCharges > 0;
+            const snakeEmergency = danger && hasSnake && !snakeActive && !overdriveActive && !powerPlacerPending;
             return (
               <button
                 onClick={activateSnake}
@@ -3411,8 +3415,11 @@ export default function App() {
                   borderRadius: 100,
                   cursor: hasSnake && !snakeActive ? 'pointer' : 'default',
                   transition: 'all 200ms',
+                  animation: snakeEmergency ? 'emergencyPulse 600ms ease-in-out infinite' : 'none',
                   boxShadow: snakeActive
                     ? '0 0 22px rgba(34,214,95,0.8), 0 0 38px rgba(0,255,194,0.5)'
+                    : snakeEmergency
+                    ? '0 0 22px rgba(34,214,95,0.8)'
                     : hasSnake
                     ? '0 0 10px rgba(34,214,95,0.35)'
                     : 'none',
@@ -3527,6 +3534,7 @@ export default function App() {
           <button
             onClick={reset}
             style={{
+              order: 11,
               padding: '7px 16px',
               fontFamily: '"Rubik", sans-serif',
               fontSize: 10,
