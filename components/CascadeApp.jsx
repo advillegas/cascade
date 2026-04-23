@@ -2811,7 +2811,7 @@ export default function App() {
 
       <div ref={shakeRef} style={{
         height: '100%',
-        padding: '6px 10px 8px',
+        padding: '6px 10px max(8px, env(safe-area-inset-bottom))',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -3237,7 +3237,7 @@ export default function App() {
           })}
         </div>
 
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
           <button
             onClick={() => {
               initAudio();
@@ -3264,10 +3264,10 @@ export default function App() {
               });
             }}
             style={{
-              padding: '10px 14px',
+              padding: '7px 12px',
               fontFamily: '"Rubik", sans-serif',
-              fontSize: 11,
-              letterSpacing: '0.15em',
+              fontSize: 10,
+              letterSpacing: '0.12em',
               fontWeight: 700,
               color: muted ? 'rgba(255,255,255,0.5)' : '#00d4ff',
               background: muted ? 'rgba(255,255,255,0.04)' : 'rgba(0,212,255,0.12)',
@@ -3312,10 +3312,10 @@ export default function App() {
                   onClick={activateOverdrive}
                   disabled={!hasCharges || overdriveActive || gameOver}
                   style={{
-                    padding: '10px 18px',
+                    padding: '7px 14px',
                     fontFamily: '"Rubik Mono One", monospace',
-                    fontSize: 13,
-                    letterSpacing: '0.1em',
+                    fontSize: 11,
+                    letterSpacing: '0.08em',
                     color: overdriveActive
                       ? '#0a0818'
                       : hasCharges
@@ -3338,11 +3338,11 @@ export default function App() {
                       ? '0 0 10px rgba(168,85,247,0.25)'
                       : 'none',
                     animation: emergency ? 'emergencyPulse 600ms ease-in-out infinite' : 'none',
-                    minWidth: 140,
+                    minWidth: 120,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 6,
+                    gap: 5,
                   }}
                 >
                   {overdriveActive ? (
@@ -3352,7 +3352,7 @@ export default function App() {
                     </>
                   ) : (
                     <>
-                      <span style={{ fontSize: 14 }}>⚡</span>
+                      <span style={{ fontSize: 12 }}>⚡</span>
                       <span>OVERDRIVE</span>
                       <span style={{
                         padding: '2px 8px',
@@ -3397,10 +3397,10 @@ export default function App() {
                 onClick={activateSnake}
                 disabled={!hasSnake || snakeActive || gameOver || overdriveActive || powerPlacerPending}
                 style={{
-                  padding: '10px 16px',
+                  padding: '7px 12px',
                   fontFamily: '"Rubik Mono One", monospace',
-                  fontSize: 12,
-                  letterSpacing: '0.08em',
+                  fontSize: 10,
+                  letterSpacing: '0.06em',
                   color: snakeActive ? '#0a3d1f' : hasSnake ? '#fff' : 'rgba(255,255,255,0.25)',
                   background: snakeActive
                     ? 'linear-gradient(135deg, #aaffcc, #22d65f)'
@@ -3472,10 +3472,10 @@ export default function App() {
                   onClick={activatePowerPlacer}
                   disabled={!hasPP || powerPlacerPending || gameOver}
                   style={{
-                    padding: '10px 16px',
+                    padding: '7px 12px',
                     fontFamily: '"Rubik Mono One", monospace',
-                    fontSize: 12,
-                    letterSpacing: '0.08em',
+                    fontSize: 10,
+                    letterSpacing: '0.06em',
                     color: powerPlacerPending
                       ? '#0a0818'
                       : hasPP
@@ -3527,10 +3527,10 @@ export default function App() {
           <button
             onClick={reset}
             style={{
-              padding: '10px 22px',
+              padding: '7px 16px',
               fontFamily: '"Rubik", sans-serif',
-              fontSize: 11,
-              letterSpacing: '0.25em',
+              fontSize: 10,
+              letterSpacing: '0.2em',
               fontWeight: 700,
               color: 'rgba(255,255,255,0.6)',
               background: 'rgba(255,255,255,0.04)',
