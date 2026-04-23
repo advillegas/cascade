@@ -1955,24 +1955,38 @@ export default function App() {
           newCells = morphedPlacement(drag.piece.cells.length, board, cursorR, cursorC);
         }
       } else {
-        // Target grid cell under the piece's top-left
+        // Exact target (bbox top-left rounded under cursor)
         const targetCol = Math.round((pLeft - rect.left) / cs);
         const targetRow = Math.round((pTop - rect.top) / cs);
-        // Continuous target (fractional) for tie-breaking
-        const fCol = (pLeft - rect.left) / cs;
-        const fRow = (pTop - rect.top) / cs;
-        // Snap search: try target, then expand outward up to radius 2.
-        // Pick the valid placement closest to the continuous target so the
-        // piece locks onto the nearest fit when cursor hovers a deadspot.
-        let bestRow = -1, bestCol = -1, bestDist = Infinity;
-        const SNAP_RADIUS = 2;
-        for (let dr = -SNAP_RADIUS; dr <= SNAP_RADIUS; dr++) {
-          for (let dc = -SNAP_RADIUS; dc <= SNAP_RADIUS; dc++) {
-            const r = targetRow + dr, c = targetCol + dc;
-            if (!canPlace(drag.piece, r, c, board)) continue;
-            const ddr = r - fRow, ddc = c - fCol;
-            const d = ddr * ddr + ddc * ddc;
-            if (d < bestDist) { bestDist = d; bestRow = r; bestCol = c; }
+
+        let bestRow = -1, bestCol = -1;
+        if (canPlace(drag.piece, targetRow, targetCol, board)) {
+          bestRow = targetRow; bestCol = targetCol;
+        } else {
+          // Snap to nearest valid placement by piece centroid distance.
+          // Brute-force ≤64 candidates so L, Z, and other asymmetric
+          // shapes always lock onto the closest fit — no deadspots.
+          const cursorX = e.clientX - rect.left;
+          const cursorY = e.clientY - rect.top;
+          const nCells = drag.piece.cells.length;
+          const MAX_SNAP_CELLS = 2.5;
+          const maxDistSq = (MAX_SNAP_CELLS * cs) * (MAX_SNAP_CELLS * cs);
+          let bestDist = Infinity;
+          for (let r = 0; r < GRID; r++) {
+            for (let c = 0; c < GRID; c++) {
+              if (!canPlace(drag.piece, r, c, board)) continue;
+              let sx = 0, sy = 0;
+              for (const [dr, dc] of drag.piece.cells) {
+                sx += (c + dc + 0.5) * cs;
+                sy += (r + dr + 0.5) * cs;
+              }
+              sx /= nCells; sy /= nCells;
+              const dx = sx - cursorX, dy = sy - cursorY;
+              const d = dx * dx + dy * dy;
+              if (d < bestDist && d <= maxDistSq) {
+                bestDist = d; bestRow = r; bestCol = c;
+              }
+            }
           }
         }
         if (bestRow >= 0) {

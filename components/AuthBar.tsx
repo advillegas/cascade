@@ -8,8 +8,8 @@ export default function AuthBar() {
     <div
       style={{
         position: 'fixed',
-        top: 10,
-        right: 10,
+        bottom: 'max(12px, env(safe-area-inset-bottom))',
+        left: 'max(12px, env(safe-area-inset-left))',
         zIndex: 10000,
         display: 'flex',
         gap: 8,
