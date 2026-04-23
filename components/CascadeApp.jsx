@@ -1782,10 +1782,11 @@ export default function App() {
       });
     }, 400);
 
-    const nextTrayArr = tray.map((p, i) => i === trayIndex ? null : p);
-    const anyLeft = nextTrayArr.some(Boolean);
-    const finalTray = anyLeft ? nextTrayArr : newTray();
-    const didRefill = !anyLeft;
+    // Immediate refill: replace the placed slot with a fresh piece every time,
+    // so players never have to drain all 3 before getting new pieces.
+    const nextTrayArr = tray.map((p, i) => i === trayIndex ? makePiece() : p);
+    const finalTray = nextTrayArr;
+    const didRefill = true;
 
     // Deep crunch on placement
     playCrunch('place');
@@ -2812,11 +2813,11 @@ export default function App() {
 
       <div ref={shakeRef} style={{
         height: '100%',
-        padding: '10px 12px 12px',
+        padding: '6px 10px 8px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 8,
+        gap: 6,
         boxSizing: 'border-box',
       }}>
 
@@ -2918,9 +2919,12 @@ export default function App() {
                 </div>
               </div>
             </div>
-            {streak >= 2 && (
+            {/* Reserved row for CHAIN / DANGER badges — always rendered so
+                HUD height stays constant and the board doesn't rescale when
+                streak or danger toggles. */}
+            <div style={{ marginTop: 4, height: 24, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {(streak >= 2) && (
               <div style={{
-                marginTop: 4,
                 padding: '4px 10px',
                 background: `linear-gradient(135deg, ${mcolor}33, ${mcolor}11)`,
                 border: `1px solid ${mcolor}88`,
@@ -2937,7 +2941,6 @@ export default function App() {
             )}
             {danger && (
               <div style={{
-                marginTop: 4,
                 padding: '4px 10px',
                 background: 'linear-gradient(135deg, rgba(255,46,110,0.3), rgba(255,46,110,0.08))',
                 border: '1px solid rgba(255,46,110,0.8)',
@@ -2955,19 +2958,18 @@ export default function App() {
                 <span style={{ fontSize: 13 }}>⚠</span> DANGER
               </div>
             )}
+            </div>
           </div>
         </div>
 
-        {/* Board — flex-grows to fill space between HUD and tray, stays square */}
+        {/* Board — takes full container width, always square */}
         <div style={{
           position: 'relative',
-          width: '100%',
-          maxWidth: 400,
-          flex: '1 1 0',
-          minHeight: 0,
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
+          // Scale to use available vertical space on mobile (small screens).
+          // 100vw cap keeps it under screen width; dvh cap stops it stealing
+          // HUD/tray space on short viewports. Max 440 on tablets.
+          width: 'min(100%, 440px, calc(100dvh - 240px))',
+          alignSelf: 'center',
         }}>
           {/* Snake mode HUD — shows above the board while snake is active */}
           {snakeActive && (
@@ -3011,12 +3013,7 @@ export default function App() {
             onPointerUp={snakeSwipe.onPointerUp}
             onPointerCancel={snakeSwipe.onPointerCancel}
             style={{
-              // Square that fits the available space (H and W), never overflows.
-              // flex parent handles centering; height min(100%, cap) keeps it square.
-              width: 'auto',
-              height: '100%',
-              maxWidth: '100%',
-              maxHeight: '100%',
+              width: '100%',
               aspectRatio: '1 / 1',
               display: 'grid',
               gridTemplateColumns: `repeat(${GRID}, 1fr)`,
@@ -3219,13 +3216,13 @@ export default function App() {
         {/* Tray */}
         <div style={{
           width: '100%',
-          maxWidth: 400,
+          maxWidth: 440,
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 10,
-          padding: 12,
+          gap: 6,
+          padding: 8,
           background: 'rgba(255,255,255,0.02)',
-          borderRadius: 14,
+          borderRadius: 12,
           border: '1px solid rgba(255,255,255,0.05)',
         }}>
           {tray.map((piece, i) => {
@@ -3235,7 +3232,7 @@ export default function App() {
                 key={`${trayKey}-${i}-${piece?.id || 'empty'}`}
                 piece={piece}
                 faded={isDragging}
-                slotSize={130}
+                slotSize={95}
                 onPointerDown={(e) => startDrag(e, i)}
               />
             );
