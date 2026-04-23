@@ -30,41 +30,10 @@ export default function FullscreenButton() {
     };
   }, []);
 
-  if (!supported) {
-    // Best we can do on iOS Safari — suggest Add to Home Screen.
-    // Detect iOS to avoid showing this hint on desktop Firefox etc.
-    const isIOS =
-      typeof navigator !== 'undefined' &&
-      /iPad|iPhone|iPod/.test(navigator.userAgent) &&
-      !(window as any).MSStream;
-    const isStandalone =
-      typeof window !== 'undefined' &&
-      (window.matchMedia('(display-mode: standalone)').matches ||
-        (window.navigator as any).standalone === true);
-    if (!isIOS || isStandalone) return null;
-    return (
-      <div
-        style={{
-          position: 'fixed',
-          bottom: 'max(12px, env(safe-area-inset-bottom))',
-          right: 'max(12px, env(safe-area-inset-right))',
-          zIndex: 9999,
-          padding: '6px 10px',
-          borderRadius: 10,
-          background: 'rgba(0,0,0,0.45)',
-          color: 'rgba(255,255,255,0.7)',
-          fontSize: 10,
-          letterSpacing: '0.08em',
-          fontFamily: '"Rubik Mono One", monospace',
-          border: '1px solid rgba(255,255,255,0.08)',
-          backdropFilter: 'blur(6px)',
-          pointerEvents: 'none',
-        }}
-      >
-        TAP SHARE → ADD TO HOME SCREEN
-      </div>
-    );
-  }
+  // On platforms without the Fullscreen API (mainly iOS Safari), just hide
+  // the button entirely. Users can still pinch-zoom / Add to Home Screen
+  // from the Share menu without a hint overlay covering the powerups.
+  if (!supported) return null;
 
   const toggle = () => {
     const el: any = document.documentElement;
