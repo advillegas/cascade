@@ -2686,9 +2686,7 @@ export default function App() {
       touchAction: 'manipulation',
       userSelect: 'none',
       WebkitUserSelect: 'none',
-      overflowY: 'auto',
-      overflowX: 'hidden',
-      WebkitOverflowScrolling: 'touch',
+      overflow: 'hidden',
       position: 'relative',
     }}>
       <style>{`
@@ -2804,11 +2802,13 @@ export default function App() {
       `}</style>
 
       <div ref={shakeRef} style={{
-        padding: '20px 16px 40px',
+        height: '100%',
+        padding: '10px 12px 12px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 16,
+        gap: 8,
+        boxSizing: 'border-box',
       }}>
 
         {/* Header */}
@@ -2949,8 +2949,17 @@ export default function App() {
           </div>
         </div>
 
-        {/* Board */}
-        <div style={{ position: 'relative', width: '100%', maxWidth: 400 }}>
+        {/* Board — flex-grows to fill space between HUD and tray, stays square */}
+        <div style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: 400,
+          flex: '1 1 0',
+          minHeight: 0,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}>
           {/* Snake mode HUD — shows above the board while snake is active */}
           {snakeActive && (
             <div style={{
@@ -2993,7 +3002,12 @@ export default function App() {
             onPointerUp={snakeSwipe.onPointerUp}
             onPointerCancel={snakeSwipe.onPointerCancel}
             style={{
-              width: '100%',
+              // Square that fits the available space (H and W), never overflows.
+              // flex parent handles centering; height min(100%, cap) keeps it square.
+              width: 'auto',
+              height: '100%',
+              maxWidth: '100%',
+              maxHeight: '100%',
               aspectRatio: '1 / 1',
               display: 'grid',
               gridTemplateColumns: `repeat(${GRID}, 1fr)`,
