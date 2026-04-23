@@ -1265,7 +1265,7 @@ export default function App() {
     snakeActiveRef.current = true;
     setSnakeActive(true);
 
-    setToast('SWIPE TO STEER');
+    setToast('SWIPE / ARROWS TO STEER');
     setTimeout(() => setToast(null), 1800);
 
     // Fanfare — snake-charmer motif
@@ -1469,6 +1469,25 @@ export default function App() {
     onPointerUp: () => { snakeSwipeStartRef.current = null; },
     onPointerCancel: () => { snakeSwipeStartRef.current = null; },
   };
+
+  // Snake keyboard controls (desktop)
+  useEffect(() => {
+    if (!snakeActive) return;
+    const KEY_DIR = {
+      ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+      w: 'up', W: 'up', s: 'down', S: 'down', a: 'left', A: 'left', d: 'right', D: 'right',
+    };
+    const onKey = (e) => {
+      const dir = KEY_DIR[e.key];
+      if (!dir) return;
+      e.preventDefault();
+      if (dir !== OPPOSITE[snakeDirRef.current]) {
+        snakeQueuedRef.current = dir;
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [snakeActive]);
 
   // DANGER: at least one placement the player could make right now would leave
   // NO remaining tray piece able to fit anywhere (immediate game over on next placement)
@@ -1911,7 +1930,7 @@ export default function App() {
       const rect = boardRef.current.getBoundingClientRect();
       const cs = rect.width / GRID;
       const d = dims(drag.piece.cells);
-      const lift = 80;
+      const lift = e.pointerType === 'mouse' ? 0 : 80;
       const pW = d.cols * cs;
       const pH = d.rows * cs;
       const pLeft = e.clientX - pW / 2;
@@ -1973,7 +1992,7 @@ export default function App() {
     const rect = boardRef.current.getBoundingClientRect();
     const cs = rect.width / GRID;
     const d = dims(piece.cells);
-    const lift = 80;
+    const lift = e.pointerType === 'mouse' ? 0 : 80;
     const pW = d.cols * cs;
     const pH = d.rows * cs;
     const pLeft = e.clientX - pW / 2;
