@@ -3346,6 +3346,8 @@ export default function App() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 5,
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {overdriveActive ? (
@@ -3355,13 +3357,13 @@ export default function App() {
                     </>
                   ) : (
                     <>
-                      <span style={{ fontSize: 12 }}>⚡</span>
-                      <span>OVERDRIVE</span>
+                      <span style={{ fontSize: 14 }}>⚡</span>
                       <span style={{
-                        padding: '2px 8px',
+                        padding: '2px 6px',
                         background: hasCharges ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.08)',
                         borderRadius: 100,
                         fontSize: 11,
+                        fontWeight: 700,
                       }}>
                         {overdriveCharges}
                       </span>
@@ -3418,7 +3420,6 @@ export default function App() {
                   borderRadius: 100,
                   cursor: hasSnake && !snakeActive ? 'pointer' : 'default',
                   transition: 'all 200ms',
-                  animation: snakeEmergency ? 'emergencyPulse 600ms ease-in-out infinite' : 'none',
                   boxShadow: snakeActive
                     ? '0 0 22px rgba(34,214,95,0.8), 0 0 38px rgba(0,255,194,0.5)'
                     : snakeEmergency
@@ -3426,21 +3427,29 @@ export default function App() {
                     : hasSnake
                     ? '0 0 10px rgba(34,214,95,0.35)'
                     : 'none',
-                  animation: snakeActive ? 'snakeHudGlow 600ms ease-in-out infinite' : 'none',
+                  animation: snakeActive
+                    ? 'snakeHudGlow 600ms ease-in-out infinite'
+                    : snakeEmergency
+                    ? 'emergencyPulse 600ms ease-in-out infinite'
+                    : 'none',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 6,
+                  justifyContent: 'center',
+                  gap: 5,
+                  overflow: 'hidden',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <span style={{ fontSize: 13 }}>🐍</span>
-                <span>{snakeActive ? 'LIVE' : 'SNAKE'}</span>
-                {/* Always render the charges badge so button width stays constant
-                    when snake toggles active — prevents layout reflow/rescale. */}
+                <span style={{ fontSize: 14 }}>🐍</span>
+                {snakeActive && <span style={{ fontSize: 10, fontWeight: 700 }}>LIVE</span>}
+                {/* Always render the charges badge (hidden while active) so
+                    the button width stays constant across state changes. */}
                 <span style={{
-                  padding: '2px 8px',
+                  padding: '2px 6px',
                   background: hasSnake ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.08)',
                   borderRadius: 100,
                   fontSize: 11,
+                  fontWeight: 700,
                   visibility: snakeActive ? 'hidden' : 'visible',
                 }}>
                   {snakeCharges}
@@ -3515,14 +3524,17 @@ export default function App() {
                       : 'none',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 6,
+                    justifyContent: 'center',
+                    gap: 5,
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
                   }}
                 >
-                  <span style={{ fontSize: 13 }}>💥</span>
-                  <span>{powerPlacerPending ? 'ARMED' : 'POWER'}</span>
+                  <span style={{ fontSize: 14 }}>💥</span>
+                  {powerPlacerPending && <span style={{ fontSize: 10, fontWeight: 700 }}>ARMED</span>}
                   {!powerPlacerPending && (
                     <span style={{
-                      padding: '2px 8px',
+                      padding: '2px 6px',
                       background: hasPP ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.08)',
                       borderRadius: 100,
                       fontSize: 11,
