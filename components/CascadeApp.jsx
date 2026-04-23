@@ -3421,7 +3421,7 @@ export default function App() {
             const isDragging = drag?.trayIndex === i && drag?.moved;
             return (
               <TrayPiece
-                key={`${trayKey}-${i}-${piece?.id || 'empty'}`}
+                key={piece?.id ? `p-${piece.id}` : `empty-${trayKey}-${i}`}
                 piece={piece}
                 faded={isDragging}
                 slotSize={95}
