@@ -72,6 +72,8 @@ const SHAPES_T3 = [
   ...expandShape([[0,0],[0,1],[0,2],[1,1]]),            // T-pent small (4)
   ...expandShape([[0,0],[0,1],[0,2],[0,3],[1,1]]),      // Y-pent (8)
   ...expandShape([[0,0],[0,1],[0,2],[1,2],[2,2]]),      // big-J corner pent (8 — partial dup)
+  // Classic T-pentomino: 3-wide top bar with a 2-cell stem down the middle.
+  ...expandShape([[0,0],[0,1],[0,2],[1,1],[2,1]]),
 ];
 
 const SHAPES_T4 = [
@@ -2341,34 +2343,56 @@ export default function App() {
           newCells = morphedPlacement(drag.piece.cells.length, board, cursorR, cursorC);
         }
       } else {
-        // Exact target (bbox top-left rounded under cursor)
-        const targetCol = Math.round((pLeft - rect.left) / cs);
-        const targetRow = Math.round((pTop - rect.top) / cs);
+        // Cursor coordinates (raw + cell-under-cursor) for placement scoring.
+        const cursorX = e.clientX - rect.left;
+        const cursorY = e.clientY - rect.top;
+        const cR = Math.floor(cursorY / cs);
+        const cC = Math.floor(cursorX / cs);
+        const nCells = drag.piece.cells.length;
 
-        let bestRow = -1, bestCol = -1;
-        if (canPlace(drag.piece, targetRow, targetCol, board)) {
-          bestRow = targetRow; bestCol = targetCol;
-        } else {
-          // Snap to nearest valid placement by piece centroid distance.
-          // Brute-force ≤64 candidates so L, Z, and other asymmetric
-          // shapes always lock onto the closest fit — no deadspots.
-          const cursorX = e.clientX - rect.left;
-          const cursorY = e.clientY - rect.top;
-          const nCells = drag.piece.cells.length;
+        // Score a candidate (row, col) by how close its centroid is to cursor.
+        const scoreAt = (r, c) => {
+          let sx = 0, sy = 0;
+          for (const [dr, dc] of drag.piece.cells) {
+            sx += (c + dc + 0.5) * cs;
+            sy += (r + dr + 0.5) * cs;
+          }
+          sx /= nCells; sy /= nCells;
+          const dx = sx - cursorX, dy = sy - cursorY;
+          return dx * dx + dy * dy;
+        };
+
+        let bestRow = -1, bestCol = -1, bestDist = Infinity;
+
+        // PASS 1 — anchor each piece cell to the cell under the cursor. This
+        // guarantees the piece visually overlaps the hovered cell whenever
+        // possible, so what the player sees matches what they get.
+        for (const [dr, dc] of drag.piece.cells) {
+          const r = cR - dr, c = cC - dc;
+          if (!canPlace(drag.piece, r, c, board)) continue;
+          const d = scoreAt(r, c);
+          if (d < bestDist) { bestDist = d; bestRow = r; bestCol = c; }
+        }
+
+        // PASS 2 — bbox top-left fallback (handles centered-on-cursor pieces
+        // when the hovered cell happens to be an empty bbox slot).
+        if (bestRow < 0) {
+          const targetCol = Math.round((pLeft - rect.left) / cs);
+          const targetRow = Math.round((pTop - rect.top) / cs);
+          if (canPlace(drag.piece, targetRow, targetCol, board)) {
+            bestRow = targetRow; bestCol = targetCol;
+            bestDist = scoreAt(targetRow, targetCol);
+          }
+        }
+
+        // PASS 3 — wider snap search for awkward shapes near edges/holes.
+        if (bestRow < 0) {
           const MAX_SNAP_CELLS = 2.5;
           const maxDistSq = (MAX_SNAP_CELLS * cs) * (MAX_SNAP_CELLS * cs);
-          let bestDist = Infinity;
           for (let r = 0; r < GRID; r++) {
             for (let c = 0; c < GRID; c++) {
               if (!canPlace(drag.piece, r, c, board)) continue;
-              let sx = 0, sy = 0;
-              for (const [dr, dc] of drag.piece.cells) {
-                sx += (c + dc + 0.5) * cs;
-                sy += (r + dr + 0.5) * cs;
-              }
-              sx /= nCells; sy /= nCells;
-              const dx = sx - cursorX, dy = sy - cursorY;
-              const d = dx * dx + dy * dy;
+              const d = scoreAt(r, c);
               if (d < bestDist && d <= maxDistSq) {
                 bestDist = d; bestRow = r; bestCol = c;
               }
