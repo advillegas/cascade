@@ -355,38 +355,95 @@ function Block({ color, size, clearing, ghost, fresh, powerup, fill, diamond }) 
         overflow: 'hidden',
       }}
     >
-      {/* Diamond facet sparkle */}
+      {/* Diamond — top-view of a brilliant cut: 8 pinwheel facets + bright table */}
       {isDiamond && !ghost && (
         <>
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            background: `linear-gradient(45deg, transparent 35%, rgba(255,255,255,0.4) 50%, transparent 65%)`,
-            pointerEvents: 'none',
-            animation: 'powerupPulse 1400ms ease-in-out infinite',
-          }} />
-          <div style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: size * 0.55,
-            color: '#fff',
-            textShadow: `0 0 ${size*0.18}px ${dGlow}, 0 0 ${size*0.35}px ${dGlow}, 0 1px 2px rgba(0,0,0,0.4)`,
-            pointerEvents: 'none',
-          }}>◆</div>
-          {/* Cracked overlay — single diagonal hit indicator */}
+          <svg
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+          >
+            {/* 8 triangular facets pinwheeling around center.
+                Solid fills with alpha so the cyan base shows through,
+                simulating refraction. Bright + dim alternate. */}
+            <polygon points="0,0 50,0 50,50"     fill="rgba(255,255,255,0.85)" />
+            <polygon points="50,0 100,0 50,50"   fill="rgba(0,160,210,0.55)"   />
+            <polygon points="100,0 100,50 50,50" fill="rgba(255,255,255,0.55)" />
+            <polygon points="100,50 100,100 50,50" fill="rgba(0,90,140,0.65)"  />
+            <polygon points="100,100 50,100 50,50" fill="rgba(255,255,255,0.7)" />
+            <polygon points="50,100 0,100 50,50" fill="rgba(0,160,210,0.55)"   />
+            <polygon points="0,100 0,50 50,50"   fill="rgba(255,255,255,0.45)" />
+            <polygon points="0,50 0,0 50,50"     fill="rgba(0,90,140,0.65)"    />
+            {/* Facet edges — thin lines that catch the eye like real cut lines */}
+            <g stroke="rgba(255,255,255,0.9)" strokeWidth="0.6" fill="none">
+              <line x1="0"   y1="0"   x2="50" y2="50" />
+              <line x1="100" y1="0"   x2="50" y2="50" />
+              <line x1="100" y1="100" x2="50" y2="50" />
+              <line x1="0"   y1="100" x2="50" y2="50" />
+              <line x1="50"  y1="0"   x2="50" y2="50" />
+              <line x1="100" y1="50"  x2="50" y2="50" />
+              <line x1="50"  y1="100" x2="50" y2="50" />
+              <line x1="0"   y1="50"  x2="50" y2="50" />
+            </g>
+            {/* Central table — bright square that glints */}
+            <rect
+              x="36" y="36" width="28" height="28" rx="3"
+              fill="rgba(255,255,255,0.55)"
+              stroke="rgba(255,255,255,0.9)"
+              strokeWidth="0.5"
+            />
+            <rect
+              x="44" y="44" width="12" height="12" rx="2"
+              fill="#ffffff"
+              opacity="0.9"
+            >
+              <animate attributeName="opacity" values="0.5;1;0.5" dur="1.6s" repeatCount="indefinite" />
+            </rect>
+          </svg>
+          {/* Cracked overlay — jagged fracture with branches and a hairline highlight */}
           {diamondCracked && (
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              background: `
-                linear-gradient(120deg, transparent 47%, rgba(255,46,110,0.85) 49%, transparent 53%),
-                linear-gradient(70deg,  transparent 50%, rgba(255,46,110,0.55) 52%, transparent 56%)
-              `,
-              pointerEvents: 'none',
-            }} />
+            <svg
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
+            >
+              {/* Main fracture */}
+              <polyline
+                points="8,18 26,32 19,48 42,54 34,72 52,82 44,96"
+                fill="none"
+                stroke="rgba(8,4,18,0.92)"
+                strokeWidth="2.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* Side branch */}
+              <polyline
+                points="42,54 62,50 76,64 70,82"
+                fill="none"
+                stroke="rgba(8,4,18,0.85)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* Smaller offshoot */}
+              <polyline
+                points="62,50 78,38 88,44"
+                fill="none"
+                stroke="rgba(8,4,18,0.7)"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* Hairline highlight along the main fracture for depth */}
+              <polyline
+                points="8,18 26,32 19,48 42,54 34,72 52,82 44,96"
+                fill="none"
+                stroke="rgba(255,255,255,0.55)"
+                strokeWidth="0.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
           )}
         </>
       )}
