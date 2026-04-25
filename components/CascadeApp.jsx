@@ -2343,54 +2343,12 @@ export default function App() {
           newCells = morphedPlacement(drag.piece.cells.length, board, cursorR, cursorC);
         }
       } else {
-        // Cursor-cell tracking: place the piece so its centre cell sits
-        // directly under the cell the cursor is currently in. Updates the
-        // instant the cursor crosses a cell boundary (no 50% rounding lag).
-        // For mobile, anchor on the lifted piece centre (not raw finger),
-        // so the visual mapping matches what the player sees.
-        const cursorX = e.clientX - rect.left;
-        const cursorY = (e.clientY - rect.top) - (e.pointerType === 'mouse' ? 0 : 80);
-        const cursorCellC = Math.floor(cursorX / cs);
-        const cursorCellR = Math.floor(cursorY / cs);
-        const centerOffC = Math.floor((d.cols - 1) / 2);
-        const centerOffR = Math.floor((d.rows - 1) / 2);
-        const targetCol = cursorCellC - centerOffC;
-        const targetRow = cursorCellR - centerOffR;
-        const nCells = drag.piece.cells.length;
-
-        const scoreAt = (r, c) => {
-          let sx = 0, sy = 0;
-          for (const [dr, dc] of drag.piece.cells) {
-            sx += (c + dc + 0.5) * cs;
-            sy += (r + dr + 0.5) * cs;
-          }
-          sx /= nCells; sy /= nCells;
-          const dx = sx - cursorX, dy = sy - cursorY;
-          return dx * dx + dy * dy;
-        };
-
-        let bestRow = -1, bestCol = -1;
-        if (canPlace(drag.piece, targetRow, targetCol, board)) {
-          bestRow = targetRow; bestCol = targetCol;
-        } else {
-          const SNAP_RADIUS = 2;
-          const MAX_SNAP_CELLS = 2.2;
-          const maxDistSq = (MAX_SNAP_CELLS * cs) * (MAX_SNAP_CELLS * cs);
-          let bestDist = Infinity;
-          for (let dr = -SNAP_RADIUS; dr <= SNAP_RADIUS; dr++) {
-            for (let dc = -SNAP_RADIUS; dc <= SNAP_RADIUS; dc++) {
-              const r = targetRow + dr, c = targetCol + dc;
-              if (!canPlace(drag.piece, r, c, board)) continue;
-              const d = scoreAt(r, c);
-              if (d < bestDist && d <= maxDistSq) {
-                bestDist = d; bestRow = r; bestCol = c;
-              }
-            }
-          }
-        }
-        if (bestRow >= 0) {
-          newCells = drag.piece.cells.map(([dr, dc]) => [bestRow + dr, bestCol + dc]);
-          meta = { row: bestRow, col: bestCol };
+        // Original placement: bbox top-left rounded to nearest grid cell.
+        const col = Math.round((pLeft - rect.left) / cs);
+        const row = Math.round((pTop - rect.top) / cs);
+        if (canPlace(drag.piece, row, col, board)) {
+          newCells = drag.piece.cells.map(([dr, dc]) => [row + dr, col + dc]);
+          meta = { row, col };
         }
       }
 
