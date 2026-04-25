@@ -950,10 +950,35 @@ export default function App() {
       }
       // iOS/Safari starts contexts suspended — must resume from a user gesture
       if (audioRef.current && audioRef.current.state === 'suspended') {
-        audioRef.current.resume();
+        const p = audioRef.current.resume();
+        // After resume actually completes, force the music-start effect to
+        // re-evaluate. Some browsers report state='running' only after the
+        // promise resolves; without this kick, the first scheduled note can
+        // hit before the context is truly running.
+        if (p && typeof p.then === 'function') {
+          p.then(() => setAudioReady(true)).catch(() => {});
+        }
       }
     } catch {}
   };
+
+  // Global first-interaction bootstrap. Browsers require a user gesture to
+  // create/resume an AudioContext. Listen for the very first pointer/touch/
+  // key event anywhere on the page and bootstrap audio there, so the
+  // theme music starts the moment the player taps anything — no need to
+  // toggle the mute button.
+  useEffect(() => {
+    const handler = () => { initAudio(); };
+    const opts = { once: true, capture: true, passive: true };
+    window.addEventListener('pointerdown', handler, opts);
+    window.addEventListener('touchstart', handler, opts);
+    window.addEventListener('keydown', handler, opts);
+    return () => {
+      window.removeEventListener('pointerdown', handler, opts);
+      window.removeEventListener('touchstart', handler, opts);
+      window.removeEventListener('keydown', handler, opts);
+    };
+  }, []);
 
   const playTone = (freq, duration, type = 'sine', gain = 0.18) => {
     if (muted || !audioRef.current) return;
