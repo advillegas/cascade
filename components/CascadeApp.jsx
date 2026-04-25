@@ -4,28 +4,98 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 
 const GRID = 8;
 
-const SHAPES = [
-  [[0,0]],
-  [[0,0],[1,1]], [[0,1],[1,0]],
-  [[0,0],[0,1]], [[0,0],[1,0]],
-  [[0,0],[0,1],[0,2]], [[0,0],[1,0],[2,0]],
-  [[0,0],[0,1],[0,2],[0,3]], [[0,0],[1,0],[2,0],[3,0]],
-  [[0,0],[0,1],[0,2],[0,3],[0,4]], [[0,0],[1,0],[2,0],[3,0],[4,0]],
-  [[0,0],[0,1],[1,0],[1,1]],
-  [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2]],
-  [[0,0],[1,0],[1,1]], [[0,0],[0,1],[1,0]],
-  [[0,0],[0,1],[1,1]], [[0,1],[1,0],[1,1]],
-  [[0,0],[1,0],[2,0],[2,1],[2,2]],
-  [[0,0],[0,1],[0,2],[1,2],[2,2]],
-  [[0,0],[0,1],[0,2],[1,0],[2,0]],
-  [[0,2],[1,2],[2,0],[2,1],[2,2]],
-  [[0,0],[0,1],[0,2],[1,1]],
-  [[0,1],[1,0],[1,1],[1,2]],
-  [[0,0],[1,0],[1,1],[2,0]],
-  [[0,1],[1,0],[1,1],[2,1]],
-  [[0,1],[0,2],[1,0],[1,1]],
-  [[0,0],[0,1],[1,1],[1,2]],
+// Shape catalog tiered by difficulty. Higher tiers have more cells and/or
+// awkward profiles that demand cleaner board state to place.
+//   T1 — trivial fillers  (1–2 cells, 2×2)
+//   T2 — standard         (3-cell L/I, basic tetrominoes)
+//   T3 — hard             (4–5 cell L/I, U/V/T pentominoes)
+//   T4 — brutal           (5+ cell awkward pentominoes, 3×3 square)
+
+const SHAPES_T1 = [
+  [[0,0]],                              // single
+  [[0,0],[0,1]],                        // 2-domino horiz
+  [[0,0],[1,0]],                        // 2-domino vert
+  [[0,0],[1,1]],                        // diag /
+  [[0,1],[1,0]],                        // diag \
+  [[0,0],[0,1],[1,0],[1,1]],            // 2×2 square
 ];
+
+const SHAPES_T2 = [
+  [[0,0],[0,1],[0,2]],                  // I-3 horiz
+  [[0,0],[1,0],[2,0]],                  // I-3 vert
+  [[0,0],[1,0],[1,1]],                  // L-3 a
+  [[0,0],[0,1],[1,0]],                  // L-3 b
+  [[0,0],[0,1],[1,1]],                  // L-3 c
+  [[0,1],[1,0],[1,1]],                  // L-3 d
+  [[0,0],[0,1],[0,2],[1,0]],            // L-tetromino
+  [[0,0],[0,1],[0,2],[1,2]],            // J-tetromino
+  [[0,0],[1,0],[1,1],[2,0]],            // T-tetromino a
+  [[0,1],[1,0],[1,1],[2,1]],            // T-tetromino b
+  [[0,1],[1,0],[1,1],[1,2]],            // T-tetromino c
+  [[0,1],[0,2],[1,0],[1,1]],            // S-tetromino
+  [[0,0],[0,1],[1,1],[1,2]],            // Z-tetromino
+];
+
+const SHAPES_T3 = [
+  [[0,0],[0,1],[0,2],[0,3]],            // I-4 horiz
+  [[0,0],[1,0],[2,0],[3,0]],            // I-4 vert
+  [[0,0],[1,0],[2,0],[2,1],[2,2]],      // big L-pent
+  [[0,0],[0,1],[0,2],[1,2],[2,2]],      // big J-pent
+  [[0,0],[0,1],[0,2],[1,0],[2,0]],      // V-pent
+  [[0,2],[1,2],[2,0],[2,1],[2,2]],      // V-pent rotated
+  [[0,0],[0,1],[0,2],[1,1]],            // T-pent (small)
+  [[0,0],[0,1],[0,2],[0,3],[1,1]],      // Y-pent
+  [[0,0],[1,0],[2,0],[3,0],[2,1]],      // Y-pent rotated
+];
+
+const SHAPES_T4 = [
+  [[0,0],[0,1],[0,2],[0,3],[0,4]],      // I-5 horiz
+  [[0,0],[1,0],[2,0],[3,0],[4,0]],      // I-5 vert
+  [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2]], // 3×3 square (nine!)
+  // X-pentomino (plus sign)
+  [[0,1],[1,0],[1,1],[1,2],[2,1]],
+  // F-pentomino
+  [[0,1],[0,2],[1,0],[1,1],[2,1]],
+  // F-pentomino mirrored
+  [[0,0],[0,1],[1,1],[1,2],[2,1]],
+  // N-pentomino
+  [[0,1],[1,1],[2,0],[2,1],[3,0]],
+  // W-pentomino
+  [[0,0],[1,0],[1,1],[2,1],[2,2]],
+  // Z-pentomino (5-cell)
+  [[0,0],[0,1],[1,1],[2,1],[2,2]],
+  // U-pentomino
+  [[0,0],[0,2],[1,0],[1,1],[1,2]],
+];
+
+const SHAPE_TIERS = [SHAPES_T1, SHAPES_T2, SHAPES_T3, SHAPES_T4];
+
+// Steep weight curve. Returns weights for [T1, T2, T3, T4] at the given level.
+// T4 starts appearing at L3, dominates by L7.
+const tierWeights = (lvl) => {
+  const L = Math.max(1, lvl);
+  const t1 = Math.max(0.05, 1.0 - L * 0.18);
+  const t2 = 0.35;
+  const t3 = Math.min(0.45, 0.05 + L * 0.06);
+  const t4 = Math.min(0.45, Math.max(0, (L - 2) * 0.09));
+  return [t1, t2, t3, t4];
+};
+
+const pickTier = (lvl) => {
+  const w = tierWeights(lvl);
+  const total = w.reduce((s, x) => s + x, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < w.length; i++) {
+    r -= w[i];
+    if (r <= 0) return i;
+  }
+  return w.length - 1;
+};
+
+// Diamond cells take 2 clears to break. Spawn rate scales with level.
+// 0% at L1, +2% per level, capped at 22% at L11+.
+const diamondChance = (lvl) =>
+  Math.min(0.22, Math.max(0, (lvl - 1) * 0.02));
 
 const PALETTE = [
   { main: '#ff2e6e', light: '#ff7aa4', dark: '#a30d43' },
@@ -143,12 +213,26 @@ const MODES = {
 const MODE_LIST = ['endless', 'goal', 'timed', 'treasure', 'snake'];
 
 const rand = () => Math.random().toString(36).slice(2, 9);
-const makePiece = () => ({
-  id: rand(),
-  cells: SHAPES[Math.floor(Math.random() * SHAPES.length)],
-  color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
-});
-const newTray = () => [makePiece(), makePiece(), makePiece()];
+
+// Optional `level` arg drives shape difficulty + diamond chance. Defaults
+// to L1 (T1-heavy, no diamonds) so legacy call sites stay safe.
+const makePiece = (level = 1) => {
+  const tier = SHAPE_TIERS[pickTier(level)];
+  const cells = tier[Math.floor(Math.random() * tier.length)];
+  // Diamond cell: hp=2 marker on at most one cell of the piece.
+  const dChance = diamondChance(level);
+  let diamondAt = -1;
+  if (cells.length > 1 && Math.random() < dChance) {
+    diamondAt = Math.floor(Math.random() * cells.length);
+  }
+  return {
+    id: rand(),
+    cells,
+    color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
+    diamondAt,
+  };
+};
+const newTray = (level = 1) => [makePiece(level), makePiece(level), makePiece(level)];
 
 // Rotate a piece's cells 90° clockwise. A cell at (r,c) in an h-row piece
 // maps to (c, h-1-r) after rotation. Then renormalize so min row/col is 0.
@@ -240,8 +324,13 @@ function mulColor(mul) {
   return '#a855f7';
 }
 
-function Block({ color, size, clearing, ghost, fresh, powerup, fill }) {
+function Block({ color, size, clearing, ghost, fresh, powerup, fill, diamond }) {
   const c = color;
+  // Diamond block: cyan/white gem palette overrides piece color so they pop.
+  const diamondPristine = diamond === 2;
+  const diamondCracked = diamond === 1;
+  const isDiamond = diamondPristine || diamondCracked;
+  const dGlow = diamondPristine ? '#7aeaff' : '#ff7aa4';
   return (
     <div
       style={{
@@ -250,19 +339,57 @@ function Block({ color, size, clearing, ghost, fresh, powerup, fill }) {
         height: fill ? '100%' : size,
         background: ghost
           ? `linear-gradient(135deg, ${c.light}55, ${c.main}44)`
+          : isDiamond
+          ? `linear-gradient(135deg, #e8fbff 0%, #7aeaff 45%, #00d4ff 100%)`
           : `linear-gradient(135deg, ${c.light} 0%, ${c.main} 55%, ${c.dark} 100%)`,
         borderRadius: size * 0.18,
         boxShadow: ghost
           ? `inset 0 0 0 2px ${c.main}99`
           : `inset ${size*0.08}px ${size*0.08}px 0 rgba(255,255,255,0.3),
              inset -${size*0.06}px -${size*0.06}px 0 rgba(0,0,0,0.28),
-             0 ${size*0.05}px ${size*0.12}px rgba(0,0,0,0.4)${powerup ? `, 0 0 ${size*0.5}px ${powerup.color}cc` : ''}`,
+             0 ${size*0.05}px ${size*0.12}px rgba(0,0,0,0.4)${powerup ? `, 0 0 ${size*0.5}px ${powerup.color}cc` : ''}${isDiamond ? `, 0 0 ${size*0.45}px ${dGlow}cc, inset 0 0 ${size*0.15}px rgba(255,255,255,0.6)` : ''}`,
         opacity: ghost ? 0.55 : 1,
         transform: clearing ? 'scale(0) rotate(180deg)' : 'scale(1) rotate(0)',
         transition: clearing ? 'transform 400ms cubic-bezier(.5,-0.3,.3,1.5), opacity 350ms' : 'transform 200ms',
         animation: fresh ? 'blockSpawn 320ms cubic-bezier(.3,1.6,.5,1) both' : 'none',
+        overflow: 'hidden',
       }}
     >
+      {/* Diamond facet sparkle */}
+      {isDiamond && !ghost && (
+        <>
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: `linear-gradient(45deg, transparent 35%, rgba(255,255,255,0.4) 50%, transparent 65%)`,
+            pointerEvents: 'none',
+            animation: 'powerupPulse 1400ms ease-in-out infinite',
+          }} />
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: size * 0.55,
+            color: '#fff',
+            textShadow: `0 0 ${size*0.18}px ${dGlow}, 0 0 ${size*0.35}px ${dGlow}, 0 1px 2px rgba(0,0,0,0.4)`,
+            pointerEvents: 'none',
+          }}>◆</div>
+          {/* Cracked overlay — single diagonal hit indicator */}
+          {diamondCracked && (
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              background: `
+                linear-gradient(120deg, transparent 47%, rgba(255,46,110,0.85) 49%, transparent 53%),
+                linear-gradient(70deg,  transparent 50%, rgba(255,46,110,0.55) 52%, transparent 56%)
+              `,
+              pointerEvents: 'none',
+            }} />
+          )}
+        </>
+      )}
       {powerup && !ghost && (
         <div style={{
           position: 'absolute',
@@ -315,7 +442,11 @@ function TrayPiece({ piece, faded, onPointerDown, slotSize, enterKey }) {
             left: c * cell,
             padding: cell * 0.06,
           }}>
-            <Block color={piece.color} size={cell - cell * 0.12} />
+            <Block
+              color={piece.color}
+              size={cell - cell * 0.12}
+              diamond={piece.diamondAt === i ? 2 : undefined}
+            />
           </div>
         ))}
       </div>
@@ -984,7 +1115,7 @@ export default function App() {
 
   const reset = () => {
     setBoard(emptyBoard());
-    setTray(newTray());
+    setTray(newTray(level));
     setTrayKey(k => k + 1);
     setScore(0);
     setDisplayScore(0);
@@ -1688,10 +1819,17 @@ export default function App() {
 
     const next = board.map(r => [...r]);
     const placedKeys = [];
+    // Map original-piece-cell index → matching cell in `cells`. For normal
+    // placements indexes line up; for overdrive's morphed placements the
+    // diamond marker is dropped (only `cells.length` is preserved there).
+    const sourceCells = piece.cells.length === cells.length ? piece.cells : null;
     cells.forEach(([r, c], i) => {
+      const isDiamondCell = sourceCells && piece.diamondAt === i;
       next[r][c] = {
         color: piece.color,
         powerup: i === powerupIdx ? chosenPowerup : null,
+        // hp=2 = pristine diamond, hp=1 = cracked, undefined = normal block.
+        diamond: isDiamondCell ? 2 : undefined,
       };
       placedKeys.push(`${r},${c}`);
     });
@@ -1703,11 +1841,15 @@ export default function App() {
 
     // Build the mask of cells being cleared
     const clearMask = new Set();
+    // Cells that must fully remove regardless of diamond hp (PP flood,
+    // BLAST, snake bites, etc — fragile-block bypass).
+    const forceClearMask = new Set();
     for (const r of rc) for (let c = 0; c < GRID; c++) clearMask.add(`${r},${c}`);
     for (const c of cc) for (let r = 0; r < GRID; r++) clearMask.add(`${r},${c}`);
 
     // POWER PLACER: flood-fill from the placed cells through connected blocks
-    // and add them all to the clear mask (shape + connected cluster all break)
+    // and add them all to the clear mask (shape + connected cluster all break).
+    // Also forces diamond removal — PP shatters fragile blocks in one hit.
     const triggeredPowerPlacer = powerPlacerPending;
     if (triggeredPowerPlacer) {
       setPowerPlacerPending(false);
@@ -1716,6 +1858,7 @@ export default function App() {
       while (queue.length) {
         const [r, c] = queue.shift();
         clearMask.add(`${r},${c}`);
+        forceClearMask.add(`${r},${c}`);
         for (const [ar, ac] of [[-1,0],[1,0],[0,-1],[0,1]]) {
           const nr = r + ar, nc = c + ac;
           if (nr < 0 || nr >= GRID || nc < 0 || nc >= GRID) continue;
@@ -1902,7 +2045,7 @@ export default function App() {
 
     // Immediate refill: replace the placed slot with a fresh piece every time,
     // so players never have to drain all 3 before getting new pieces.
-    const nextTrayArr = tray.map((p, i) => i === trayIndex ? makePiece() : p);
+    const nextTrayArr = tray.map((p, i) => i === trayIndex ? makePiece(level) : p);
     const finalTray = nextTrayArr;
     const didRefill = true;
 
@@ -1966,7 +2109,13 @@ export default function App() {
         for (const k of clearMask) {
           const [r, c] = k.split(',').map(Number);
           const cell = next[r][c];
-          if (cell) clearedCells.push({ r, c, color: cell.color });
+          // Skip particles for diamonds that are just cracking — unless
+          // forceClearMask says they're being shattered (PP, etc.).
+          const stayingDiamond =
+            cell && cell.diamond && cell.diamond > 1 && !forceClearMask.has(k);
+          if (cell && !stayingDiamond) {
+            clearedCells.push({ r, c, color: cell.color });
+          }
         }
         addParticles(clearedCells, boardRect);
       }
@@ -1976,11 +2125,19 @@ export default function App() {
       setBoard(next);
       setClearing({ rows: rc, cols: cc, extra: triggeredPowerPlacer ? Array.from(clearMask) : null });
       setTimeout(() => {
-        // Clear every cell in the mask (lines + power-placer flood)
+        // Clear every cell in the mask (lines + power-placer flood).
+        // Diamond cells take 2 clears: hp 2 → 1 (cracked, stays), hp 1 → 0 (gone).
+        // Cells in forceClearMask (PP flood) bypass the hp rule and remove fully.
         let cleared = next.map(r => [...r]);
         for (const k of clearMask) {
           const [r, c] = k.split(',').map(Number);
-          cleared[r][c] = null;
+          const cell = cleared[r][c];
+          const force = forceClearMask.has(k);
+          if (!force && cell && cell.diamond && cell.diamond > 1) {
+            cleared[r][c] = { ...cell, diamond: cell.diamond - 1 };
+          } else {
+            cleared[r][c] = null;
+          }
         }
 
         // Apply positional powerup effects in order (BLAST/SHUFFLE/GRAVITY)
@@ -3041,14 +3198,27 @@ export default function App() {
               alignItems: 'center',
               gap: 6,
             }}>
-              <span style={{
-                display: 'inline-block',
-                padding: '2px 6px',
-                background: 'rgba(168,85,247,0.2)',
-                borderRadius: 4,
-                color: '#cb91fb',
-                fontWeight: 700,
-              }}>LVL {level}</span>
+              {(() => {
+                // Tier-based color: purple (easy) → orange (mid) → red (brutal)
+                const tier = level >= 10 ? 3 : level >= 6 ? 2 : level >= 3 ? 1 : 0;
+                const palette = [
+                  { bg: 'rgba(168,85,247,0.2)', fg: '#cb91fb' },
+                  { bg: 'rgba(255,123,46,0.22)', fg: '#ffb87a' },
+                  { bg: 'rgba(255,46,110,0.22)', fg: '#ff7aa4' },
+                  { bg: 'rgba(255,46,46,0.28)', fg: '#ff5252' },
+                ][tier];
+                return (
+                  <span style={{
+                    display: 'inline-block',
+                    padding: '2px 6px',
+                    background: palette.bg,
+                    borderRadius: 4,
+                    color: palette.fg,
+                    fontWeight: 700,
+                    transition: 'all 400ms',
+                  }}>LVL {level}</span>
+                );
+              })()}
               <span>{clearCount} CLEARS</span>
             </div>
             <div style={{
@@ -3271,7 +3441,7 @@ export default function App() {
                 >
                   {cell && (
                     <div style={{ position: 'absolute', inset: 0 }}>
-                      <Block color={cell.color} size={boardCell - 2} clearing={isClearing} fresh={isFresh} powerup={cell.powerup} fill />
+                      <Block color={cell.color} size={boardCell - 2} clearing={isClearing} fresh={isFresh} powerup={cell.powerup} diamond={cell.diamond} fill />
                     </div>
                   )}
                   {/* Flood preview: EXISTING block about to be destroyed by Power Placer */}
@@ -3830,6 +4000,7 @@ export default function App() {
                   ? { main: '#ff7b2e', light: '#ffd60a', dark: '#a30d43' }
                   : drag.piece.color}
                 size={boardCell - 2}
+                diamond={drag.piece.diamondAt === i ? 2 : undefined}
               />
             </div>
           ))}
