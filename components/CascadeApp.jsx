@@ -1773,11 +1773,11 @@ export default function App() {
     });
   };
 
-  // Timed-mode countdown. Ticks every 100 ms for smooth display. The timer
-  // freezes while overdrive or snake is active so the player can't lose
-  // while a powerup is running, per design.
+  // Timed-mode countdown. Only runs on the actual game screen — selecting
+  // TIMED on the menu used to spin up this interval immediately, find the
+  // default timeRemaining=0, and fire the lose-sweep / game-over branch.
   useEffect(() => {
-    if (mode !== 'timed' || gameOver) return;
+    if (mode !== 'timed' || gameOver || screen !== 'game') return;
     const tickMs = 100;
     const id = setInterval(() => {
       if (overdriveActive || snakeActiveRef.current || pausedRef.current) return;
@@ -1801,7 +1801,7 @@ export default function App() {
       });
     }, tickMs);
     return () => clearInterval(id);
-  }, [mode, gameOver, overdriveActive]);
+  }, [mode, gameOver, overdriveActive, screen]);
 
   // Snake swipe handlers (attached to board container while active)
   const snakeSwipe = {
@@ -2772,7 +2772,15 @@ export default function App() {
               return (
                 <button
                   key={m}
-                  onClick={() => { initAudio(); setMode(m); }}
+                  onClick={() => {
+                    initAudio();
+                    setMode(m);
+                    // Light selection pop — does not interrupt the menu music.
+                    if (!mutedRef.current && audioRef.current) {
+                      try { playTone(720, 0.05, 'triangle', 0.1); } catch {}
+                    }
+                    vibe(8);
+                  }}
                   style={{
                     padding: '8px 18px',
                     fontFamily: '"Rubik Mono One", monospace',
