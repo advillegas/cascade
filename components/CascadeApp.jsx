@@ -11,61 +11,85 @@ const GRID = 8;
 //   T3 — hard             (4–5 cell L/I, U/V/T pentominoes)
 //   T4 — brutal           (5+ cell awkward pentominoes, 3×3 square)
 
+// Normalize a cell list so its bounding box starts at (0,0) and the cells
+// are sorted — gives us a stable key for dedup across rotations/mirrors.
+const normalizeCells = (cells) => {
+  let minR = Infinity, minC = Infinity;
+  for (const [r, c] of cells) {
+    if (r < minR) minR = r;
+    if (c < minC) minC = c;
+  }
+  return cells
+    .map(([r, c]) => [r - minR, c - minC])
+    .sort((a, b) => (a[0] - b[0]) || (a[1] - b[1]));
+};
+
+// Generate every unique orientation of a shape: 4 rotations × 2 mirror states.
+// Returns up to 8 unique cell lists. Symmetric pieces collapse naturally.
+const expandShape = (base) => {
+  const out = [];
+  const seen = new Set();
+  const variants = [
+    base,
+    base.map(([r, c]) => [r, -c]),  // horizontal mirror
+  ];
+  for (const v of variants) {
+    let cur = v;
+    for (let i = 0; i < 4; i++) {
+      const norm = normalizeCells(cur);
+      const k = JSON.stringify(norm);
+      if (!seen.has(k)) {
+        seen.add(k);
+        out.push(norm);
+      }
+      cur = rotateCells(cur);
+    }
+  }
+  return out;
+};
+
+// Each canonical piece is auto-expanded to all unique rotations + mirrors,
+// so players see L/J, S/Z, F/F-mirror, N/N-mirror etc. all from one entry.
 const SHAPES_T1 = [
-  [[0,0]],                              // single
-  [[0,0],[0,1]],                        // 2-domino horiz
-  [[0,0],[1,0]],                        // 2-domino vert
-  [[0,0],[1,1]],                        // diag /
-  [[0,1],[1,0]],                        // diag \
-  [[0,0],[0,1],[1,0],[1,1]],            // 2×2 square
+  ...expandShape([[0,0]]),                        // single
+  ...expandShape([[0,0],[0,1]]),                  // domino
+  ...expandShape([[0,0],[1,1]]),                  // diagonal
+  ...expandShape([[0,0],[0,1],[1,0],[1,1]]),      // 2×2 square
 ];
 
 const SHAPES_T2 = [
-  [[0,0],[0,1],[0,2]],                  // I-3 horiz
-  [[0,0],[1,0],[2,0]],                  // I-3 vert
-  [[0,0],[1,0],[1,1]],                  // L-3 a
-  [[0,0],[0,1],[1,0]],                  // L-3 b
-  [[0,0],[0,1],[1,1]],                  // L-3 c
-  [[0,1],[1,0],[1,1]],                  // L-3 d
-  [[0,0],[0,1],[0,2],[1,0]],            // L-tetromino
-  [[0,0],[0,1],[0,2],[1,2]],            // J-tetromino
-  [[0,0],[1,0],[1,1],[2,0]],            // T-tetromino a
-  [[0,1],[1,0],[1,1],[2,1]],            // T-tetromino b
-  [[0,1],[1,0],[1,1],[1,2]],            // T-tetromino c
-  [[0,1],[0,2],[1,0],[1,1]],            // S-tetromino
-  [[0,0],[0,1],[1,1],[1,2]],            // Z-tetromino
+  ...expandShape([[0,0],[0,1],[0,2]]),            // I-3 (2 orientations)
+  ...expandShape([[0,0],[1,0],[1,1]]),            // L-3 (4)
+  ...expandShape([[0,0],[0,1],[0,2],[1,0]]),      // L/J-tetromino (8)
+  ...expandShape([[0,0],[1,0],[1,1],[2,0]]),      // T-tetromino (4)
+  ...expandShape([[0,1],[0,2],[1,0],[1,1]]),      // S/Z-tetromino (4)
 ];
 
 const SHAPES_T3 = [
-  [[0,0],[0,1],[0,2],[0,3]],            // I-4 horiz
-  [[0,0],[1,0],[2,0],[3,0]],            // I-4 vert
-  [[0,0],[1,0],[2,0],[2,1],[2,2]],      // big L-pent
-  [[0,0],[0,1],[0,2],[1,2],[2,2]],      // big J-pent
-  [[0,0],[0,1],[0,2],[1,0],[2,0]],      // V-pent
-  [[0,2],[1,2],[2,0],[2,1],[2,2]],      // V-pent rotated
-  [[0,0],[0,1],[0,2],[1,1]],            // T-pent (small)
-  [[0,0],[0,1],[0,2],[0,3],[1,1]],      // Y-pent
-  [[0,0],[1,0],[2,0],[3,0],[2,1]],      // Y-pent rotated
+  ...expandShape([[0,0],[0,1],[0,2],[0,3]]),            // I-4 (2)
+  ...expandShape([[0,0],[1,0],[2,0],[2,1],[2,2]]),      // big L/J-pent (8)
+  ...expandShape([[0,0],[0,1],[0,2],[1,0],[2,0]]),      // V-pent (4)
+  ...expandShape([[0,0],[0,1],[0,2],[1,1]]),            // T-pent small (4)
+  ...expandShape([[0,0],[0,1],[0,2],[0,3],[1,1]]),      // Y-pent (8)
+  ...expandShape([[0,0],[0,1],[0,2],[1,2],[2,2]]),      // big-J corner pent (8 — partial dup)
 ];
 
 const SHAPES_T4 = [
-  [[0,0],[0,1],[0,2],[0,3],[0,4]],      // I-5 horiz
-  [[0,0],[1,0],[2,0],[3,0],[4,0]],      // I-5 vert
-  [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2]], // 3×3 square (nine!)
-  // X-pentomino (plus sign)
-  [[0,1],[1,0],[1,1],[1,2],[2,1]],
-  // F-pentomino
-  [[0,1],[0,2],[1,0],[1,1],[2,1]],
-  // F-pentomino mirrored
-  [[0,0],[0,1],[1,1],[1,2],[2,1]],
-  // N-pentomino
-  [[0,1],[1,1],[2,0],[2,1],[3,0]],
-  // W-pentomino
-  [[0,0],[1,0],[1,1],[2,1],[2,2]],
-  // Z-pentomino (5-cell)
-  [[0,0],[0,1],[1,1],[2,1],[2,2]],
-  // U-pentomino
-  [[0,0],[0,2],[1,0],[1,1],[1,2]],
+  ...expandShape([[0,0],[0,1],[0,2],[0,3],[0,4]]),      // I-5 (2)
+  // 3×3 square — perfectly symmetric, only one orientation.
+  [[0,0],[0,1],[0,2],[1,0],[1,1],[1,2],[2,0],[2,1],[2,2]],
+  // X-pentomino (plus sign) — symmetric, only one orientation.
+  ...expandShape([[0,1],[1,0],[1,1],[1,2],[2,1]]),
+  // F-pentomino (8 orientations — F + F-mirror, all rotations)
+  ...expandShape([[0,1],[0,2],[1,0],[1,1],[2,1]]),
+  // N-pentomino (8 orientations)
+  ...expandShape([[0,1],[1,1],[2,0],[2,1],[3,0]]),
+  // W-pentomino (4 orientations)
+  ...expandShape([[0,0],[1,0],[1,1],[2,1],[2,2]]),
+  // Z-pentomino (4 orientations)
+  ...expandShape([[0,0],[0,1],[1,1],[2,1],[2,2]]),
+  // U-pentomino (4 orientations)
+  ...expandShape([[0,0],[0,2],[1,0],[1,1],[1,2]]),
 ];
 
 const SHAPE_TIERS = [SHAPES_T1, SHAPES_T2, SHAPES_T3, SHAPES_T4];
@@ -234,9 +258,9 @@ const makePiece = (level = 1) => {
 };
 const newTray = (level = 1) => [makePiece(level), makePiece(level), makePiece(level)];
 
-// Rotate a piece's cells 90° clockwise. A cell at (r,c) in an h-row piece
-// maps to (c, h-1-r) after rotation. Then renormalize so min row/col is 0.
-const rotateCells = (cells) => {
+// Hoisted via `function` so the SHAPES catalog (above) can call it from
+// expandShape during module load — `const = (...) =>` would TDZ-error here.
+function rotateCells(cells) {
   let maxR = 0;
   for (const [r] of cells) if (r > maxR) maxR = r;
   const rotated = cells.map(([r, c]) => [c, maxR - r]);
@@ -246,7 +270,7 @@ const rotateCells = (cells) => {
     if (c < minC) minC = c;
   }
   return rotated.map(([r, c]) => [r - minR, c - minC]);
-};
+}
 const dims = (cells) => {
   let mr = 0, mc = 0;
   for (const [r, c] of cells) { if (r > mr) mr = r; if (c > mc) mc = c; }
@@ -324,13 +348,15 @@ function mulColor(mul) {
   return '#a855f7';
 }
 
-function Block({ color, size, clearing, ghost, fresh, powerup, fill, diamond }) {
+function Block({ color, size, clearing, cracking, ghost, fresh, powerup, fill, diamond }) {
   const c = color;
   // Diamond block: cyan/white gem palette overrides piece color so they pop.
   const diamondPristine = diamond === 2;
-  const diamondCracked = diamond === 1;
+  // Show the cracked overlay either when state already has hp=1, OR while
+  // we're mid-cracking-animation (state hasn't decremented yet).
+  const diamondCracked = diamond === 1 || cracking;
   const isDiamond = diamondPristine || diamondCracked;
-  const dGlow = diamondPristine ? '#7aeaff' : '#ff7aa4';
+  const dGlow = (diamondPristine && !cracking) ? '#7aeaff' : '#ff7aa4';
   return (
     <div
       style={{
@@ -349,9 +375,14 @@ function Block({ color, size, clearing, ghost, fresh, powerup, fill, diamond }) 
              inset -${size*0.06}px -${size*0.06}px 0 rgba(0,0,0,0.28),
              0 ${size*0.05}px ${size*0.12}px rgba(0,0,0,0.4)${powerup ? `, 0 0 ${size*0.5}px ${powerup.color}cc` : ''}${isDiamond ? `, 0 0 ${size*0.45}px ${dGlow}cc, inset 0 0 ${size*0.15}px rgba(255,255,255,0.6)` : ''}`,
         opacity: ghost ? 0.55 : 1,
-        transform: clearing ? 'scale(0) rotate(180deg)' : 'scale(1) rotate(0)',
-        transition: clearing ? 'transform 400ms cubic-bezier(.5,-0.3,.3,1.5), opacity 350ms' : 'transform 200ms',
-        animation: fresh ? 'blockSpawn 320ms cubic-bezier(.3,1.6,.5,1) both' : 'none',
+        // Cracking diamonds STAY in place — shake them instead of scale-to-zero.
+        transform: (clearing && !cracking) ? 'scale(0) rotate(180deg)' : 'scale(1) rotate(0)',
+        transition: (clearing && !cracking) ? 'transform 400ms cubic-bezier(.5,-0.3,.3,1.5), opacity 350ms' : 'transform 200ms',
+        animation: fresh
+          ? 'blockSpawn 320ms cubic-bezier(.3,1.6,.5,1) both'
+          : cracking
+          ? 'diamondCrack 440ms cubic-bezier(.36,.07,.19,.97) both'
+          : 'none',
         overflow: 'hidden',
       }}
     >
@@ -1812,6 +1843,8 @@ export default function App() {
   // Suppressed during overdrive since placement is always possible then.
   const danger = useMemo(() => {
     if (gameOver || overdriveActive) return false;
+    // Timed mode: under 10 seconds is a danger state on its own.
+    if (mode === 'timed' && timeRemaining > 0 && timeRemaining <= 10) return true;
     const pieces = tray.filter(Boolean);
     if (pieces.length <= 1) return false; // need ≥2 pieces to have "remaining"
     for (let i = 0; i < pieces.length; i++) {
@@ -1834,7 +1867,7 @@ export default function App() {
       }
     }
     return false;
-  }, [board, tray, gameOver, overdriveActive, canPlace, canFit]);
+  }, [board, tray, gameOver, overdriveActive, canPlace, canFit, mode, timeRemaining]);
 
   // Sync danger to a ref so the music scheduler can read the latest value
   useEffect(() => { dangerRef.current = danger; }, [danger]);
@@ -3131,6 +3164,15 @@ export default function App() {
           60% { transform: scale(1.2) rotate(8deg); opacity: 1; }
           100% { transform: scale(1) rotate(0); opacity: 1; }
         }
+        @keyframes diamondCrack {
+          0%   { transform: scale(1) translate(0, 0) rotate(0); }
+          15%  { transform: scale(1.08) translate(-2px, -1px) rotate(-3deg); filter: brightness(1.4); }
+          30%  { transform: scale(0.96) translate(2px, 1px) rotate(2deg); filter: brightness(1.2); }
+          45%  { transform: scale(1.02) translate(-1px, 1px) rotate(-1.5deg); }
+          60%  { transform: scale(1) translate(1px, -1px) rotate(1deg); }
+          75%  { transform: scale(1) translate(-0.5px, 0) rotate(-0.5deg); }
+          100% { transform: scale(1) translate(0, 0) rotate(0); filter: brightness(1); }
+        }
         @keyframes trayEnter {
           0% { transform: scale(0) translateY(20px); opacity: 0; }
           100% { transform: scale(1) translateY(0); opacity: 1; }
@@ -3485,6 +3527,13 @@ export default function App() {
               const isPreview = previewSet.has(key);
               const isFresh = freshCells.has(key);
               const isFlood = floodSet.has(key);
+              // Diamonds with hp>1 don't actually disappear on a normal line
+              // clear — they crack in place. Reroute the visual so the Block
+              // shakes + reveals the crack instead of scaling to zero.
+              const inExtra = clearing.extra ? clearing.extra.includes(key) : false;
+              const isCrackingDiamond =
+                isClearing && !inExtra && cell?.diamond && cell.diamond > 1;
+              const isClearingForBlock = isClearing && !isCrackingDiamond;
               const previewColor = drag?.piece.color;
               return (
                 <div
@@ -3500,7 +3549,7 @@ export default function App() {
                 >
                   {cell && (
                     <div style={{ position: 'absolute', inset: 0 }}>
-                      <Block color={cell.color} size={boardCell - 2} clearing={isClearing} fresh={isFresh} powerup={cell.powerup} diamond={cell.diamond} fill />
+                      <Block color={cell.color} size={boardCell - 2} clearing={isClearingForBlock} cracking={isCrackingDiamond} fresh={isFresh} powerup={cell.powerup} diamond={cell.diamond} fill />
                     </div>
                   )}
                   {/* Flood preview: EXISTING block about to be destroyed by Power Placer */}
