@@ -2343,14 +2343,19 @@ export default function App() {
           newCells = morphedPlacement(drag.piece.cells.length, board, cursorR, cursorC);
         }
       } else {
-        // Cursor coordinates (raw + cell-under-cursor) for placement scoring.
+        // Smooth cursor-tracked placement.
+        // 1) If the bbox-target cell is a valid placement, use it directly —
+        //    one cell change per cursor cell, no jumps.
+        // 2) Otherwise, snap to the nearest valid placement within a small
+        //    radius around the target. Searching a local ring (not the whole
+        //    grid, not piece-cell anchors) keeps the choice continuous as the
+        //    cursor moves through deadspots.
         const cursorX = e.clientX - rect.left;
         const cursorY = e.clientY - rect.top;
-        const cR = Math.floor(cursorY / cs);
-        const cC = Math.floor(cursorX / cs);
+        const targetCol = Math.round((pLeft - rect.left) / cs);
+        const targetRow = Math.round((pTop - rect.top) / cs);
         const nCells = drag.piece.cells.length;
 
-        // Score a candidate (row, col) by how close its centroid is to cursor.
         const scoreAt = (r, c) => {
           let sx = 0, sy = 0;
           for (const [dr, dc] of drag.piece.cells) {
@@ -2362,35 +2367,17 @@ export default function App() {
           return dx * dx + dy * dy;
         };
 
-        let bestRow = -1, bestCol = -1, bestDist = Infinity;
-
-        // PASS 1 — anchor each piece cell to the cell under the cursor. This
-        // guarantees the piece visually overlaps the hovered cell whenever
-        // possible, so what the player sees matches what they get.
-        for (const [dr, dc] of drag.piece.cells) {
-          const r = cR - dr, c = cC - dc;
-          if (!canPlace(drag.piece, r, c, board)) continue;
-          const d = scoreAt(r, c);
-          if (d < bestDist) { bestDist = d; bestRow = r; bestCol = c; }
-        }
-
-        // PASS 2 — bbox top-left fallback (handles centered-on-cursor pieces
-        // when the hovered cell happens to be an empty bbox slot).
-        if (bestRow < 0) {
-          const targetCol = Math.round((pLeft - rect.left) / cs);
-          const targetRow = Math.round((pTop - rect.top) / cs);
-          if (canPlace(drag.piece, targetRow, targetCol, board)) {
-            bestRow = targetRow; bestCol = targetCol;
-            bestDist = scoreAt(targetRow, targetCol);
-          }
-        }
-
-        // PASS 3 — wider snap search for awkward shapes near edges/holes.
-        if (bestRow < 0) {
-          const MAX_SNAP_CELLS = 2.5;
+        let bestRow = -1, bestCol = -1;
+        if (canPlace(drag.piece, targetRow, targetCol, board)) {
+          bestRow = targetRow; bestCol = targetCol;
+        } else {
+          const SNAP_RADIUS = 2;
+          const MAX_SNAP_CELLS = 2.2;
           const maxDistSq = (MAX_SNAP_CELLS * cs) * (MAX_SNAP_CELLS * cs);
-          for (let r = 0; r < GRID; r++) {
-            for (let c = 0; c < GRID; c++) {
+          let bestDist = Infinity;
+          for (let dr = -SNAP_RADIUS; dr <= SNAP_RADIUS; dr++) {
+            for (let dc = -SNAP_RADIUS; dc <= SNAP_RADIUS; dc++) {
+              const r = targetRow + dr, c = targetCol + dc;
               if (!canPlace(drag.piece, r, c, board)) continue;
               const d = scoreAt(r, c);
               if (d < bestDist && d <= maxDistSq) {
