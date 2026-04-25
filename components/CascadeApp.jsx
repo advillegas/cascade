@@ -936,11 +936,17 @@ export default function App() {
     el.style.animation = `shake${shakeLevel} ${380 + shakeLevel * 40}ms cubic-bezier(.36,.07,.19,.97) both`;
   }, [shakeKey, shakeLevel]);
 
+  const [audioReady, setAudioReady] = useState(false);
   const initAudio = () => {
     try {
       if (!audioRef.current) {
         const AC = window.AudioContext || window.webkitAudioContext;
-        if (AC) audioRef.current = new AC();
+        if (AC) {
+          audioRef.current = new AC();
+          // Flip the state flag so the music-start effect can re-run now
+          // that an AudioContext exists (effect can't watch refs directly).
+          setAudioReady(true);
+        }
       }
       // iOS/Safari starts contexts suspended — must resume from a user gesture
       if (audioRef.current && audioRef.current.state === 'suspended') {
@@ -1888,12 +1894,16 @@ export default function App() {
 
   useEffect(() => { tensionRef.current = tension; }, [tension]);
 
-  // Start/stop music based on mute state and game state
+  // Start/stop music based on mute state, game state, and audio readiness.
+  // Watching `audioReady` is critical: AudioContext can only be created on a
+  // user gesture, so on first mount audioRef.current is null. Once initAudio
+  // runs (e.g. starting a game, dragging a piece, tapping a button) the
+  // audioReady flag flips and this effect re-runs to kick off the music.
   useEffect(() => {
     if (!muted && !gameOver && audioRef.current) startMusic();
     else stopMusic();
     return () => stopMusic();
-  }, [muted, gameOver]);
+  }, [muted, gameOver, audioReady]);
 
   // place() now takes an explicit cells array so the same path handles
   // normal shape placements AND overdrive morphed placements.
