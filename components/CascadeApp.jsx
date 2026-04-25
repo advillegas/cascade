@@ -2343,10 +2343,42 @@ export default function App() {
           newCells = morphedPlacement(drag.piece.cells.length, board, cursorR, cursorC);
         }
       } else {
-        // Original placement: bbox top-left rounded to nearest grid cell.
-        const col = Math.round((pLeft - rect.left) / cs);
-        const row = Math.round((pTop - rect.top) / cs);
-        if (canPlace(drag.piece, row, col, board)) {
+        // Primary target — bbox top-left rounded (original logic, no shift).
+        // When the exact target is valid we use it as-is, so cursor tracking
+        // is identical to the old behaviour. No displacement.
+        const targetCol = Math.round((pLeft - rect.left) / cs);
+        const targetRow = Math.round((pTop - rect.top) / cs);
+        let row = -1, col = -1;
+        if (canPlace(drag.piece, targetRow, targetCol, board)) {
+          row = targetRow; col = targetCol;
+        } else {
+          // Deadspot rescue — runs ONLY when the exact target can't fit.
+          // Search the immediate ±1 ring and pick the candidate whose
+          // centroid is closest to the cursor. Tiny radius means the snap
+          // never moves more than one cell from where the player aimed,
+          // so it feels like a small assist, not a teleport.
+          const cursorX = e.clientX - rect.left;
+          const cursorY = e.clientY - rect.top - (e.pointerType === 'mouse' ? 0 : 80);
+          const nCells = drag.piece.cells.length;
+          let bestDist = Infinity;
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              if (dr === 0 && dc === 0) continue;
+              const r = targetRow + dr, c = targetCol + dc;
+              if (!canPlace(drag.piece, r, c, board)) continue;
+              let sx = 0, sy = 0;
+              for (const [pdr, pdc] of drag.piece.cells) {
+                sx += (c + pdc + 0.5) * cs;
+                sy += (r + pdr + 0.5) * cs;
+              }
+              sx /= nCells; sy /= nCells;
+              const dx = sx - cursorX, dy = sy - cursorY;
+              const d = dx * dx + dy * dy;
+              if (d < bestDist) { bestDist = d; row = r; col = c; }
+            }
+          }
+        }
+        if (row >= 0) {
           newCells = drag.piece.cells.map(([dr, dc]) => [row + dr, col + dc]);
           meta = { row, col };
         }
