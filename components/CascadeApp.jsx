@@ -2343,17 +2343,19 @@ export default function App() {
           newCells = morphedPlacement(drag.piece.cells.length, board, cursorR, cursorC);
         }
       } else {
-        // Smooth cursor-tracked placement.
-        // 1) If the bbox-target cell is a valid placement, use it directly —
-        //    one cell change per cursor cell, no jumps.
-        // 2) Otherwise, snap to the nearest valid placement within a small
-        //    radius around the target. Searching a local ring (not the whole
-        //    grid, not piece-cell anchors) keeps the choice continuous as the
-        //    cursor moves through deadspots.
+        // Cursor-cell tracking: place the piece so its centre cell sits
+        // directly under the cell the cursor is currently in. Updates the
+        // instant the cursor crosses a cell boundary (no 50% rounding lag).
+        // For mobile, anchor on the lifted piece centre (not raw finger),
+        // so the visual mapping matches what the player sees.
         const cursorX = e.clientX - rect.left;
-        const cursorY = e.clientY - rect.top;
-        const targetCol = Math.round((pLeft - rect.left) / cs);
-        const targetRow = Math.round((pTop - rect.top) / cs);
+        const cursorY = (e.clientY - rect.top) - (e.pointerType === 'mouse' ? 0 : 80);
+        const cursorCellC = Math.floor(cursorX / cs);
+        const cursorCellR = Math.floor(cursorY / cs);
+        const centerOffC = Math.floor((d.cols - 1) / 2);
+        const centerOffR = Math.floor((d.rows - 1) / 2);
+        const targetCol = cursorCellC - centerOffC;
+        const targetRow = cursorCellR - centerOffR;
         const nCells = drag.piece.cells.length;
 
         const scoreAt = (r, c) => {
