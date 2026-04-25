@@ -495,7 +495,7 @@ export default function App() {
   const [popups, setPopups] = useState([]);
   const [particles, setParticles] = useState([]);
   const [freshCells, setFreshCells] = useState(new Set());
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const [shakeKey, setShakeKey] = useState(0);
   const [shakeLevel, setShakeLevel] = useState(1);
 
@@ -575,7 +575,9 @@ export default function App() {
         if (get(5) != null) setLastDailyClaim(parseInt(get(5)) || 0);
         if (get(6) != null) setPowerPlacerCharges(parseInt(get(6)) || 0);
         if (get(7) != null) setOverdriveCharges(parseInt(get(7)) || 2);
-        if (get(8) === 'false') setMuted(false);
+        // Default is unmuted; only honor stored value if explicitly 'true'
+      if (get(8) === 'true') setMuted(true);
+      else if (get(8) === 'false') setMuted(false);
         if (get(9) != null) { const x = parseInt(get(9)) || 0; setXp(x); xpRef.current = x; }
         if (get(10) != null) setPlayStreak(parseInt(get(10)) || 0);
         if (get(11) != null) setLastPlayDate(parseInt(get(11)) || 0);
@@ -798,7 +800,7 @@ export default function App() {
   const musicRef = useRef({ timer: null, step: 0 });
   const dangerRef = useRef(false);
   const tensionRef = useRef(0);
-  const mutedRef = useRef(true);
+  const mutedRef = useRef(false);
 
   const level = Math.floor(score / 1000) + 1;
   const levelProgress = (score % 1000) / 1000;
