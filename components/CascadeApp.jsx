@@ -2039,12 +2039,20 @@ export default function App() {
         }, 350);
       }
 
-      // PERFECT CLEAR: board becomes fully empty after this clear
-      // (next is the board with placed cells; subtract what's being cleared)
+      // PERFECT CLEAR: board becomes fully empty after this clear.
+      // Cracking diamonds (hp>1, not in forceClearMask) STAY on the board
+      // — they only crack — so they must count as "remaining" or we'd
+      // celebrate PERFECT while a damaged diamond is still sitting there.
       let anyRemaining = false;
       for (let r = 0; r < GRID && !anyRemaining; r++) {
         for (let c = 0; c < GRID; c++) {
-          if (next[r][c] && !clearMask.has(`${r},${c}`)) {
+          const cell = next[r][c];
+          if (!cell) continue;
+          const k = `${r},${c}`;
+          const inClear = clearMask.has(k);
+          const stayingDiamond =
+            inClear && cell.diamond && cell.diamond > 1 && !forceClearMask.has(k);
+          if (!inClear || stayingDiamond) {
             anyRemaining = true;
             break;
           }
