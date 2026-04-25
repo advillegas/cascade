@@ -3564,8 +3564,11 @@ export default function App() {
                     gridColumn: c + 1,
                     position: 'relative',
                     borderRadius: 6,
-                    background: cell ? 'transparent' : 'rgba(255,255,255,0.025)',
-                    boxShadow: cell ? 'none' : 'inset 0 0 0 1px rgba(255,255,255,0.02)',
+                    // Permanent grid slot — backdrop + inset border render
+                    // even when a block sits on top, so clearing reveals
+                    // the same slot instead of looking like it reappeared.
+                    background: 'rgba(255,255,255,0.025)',
+                    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.02)',
                   }}
                 >
                   {cell && (
